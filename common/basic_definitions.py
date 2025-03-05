@@ -2,7 +2,7 @@ import codecs
 from typing import Tuple
 
 from text_unidecode import unidecode
-from transformers import AutoTokenizer
+from transformers import DebertaTokenizer
 
 from .constants import PATH_TO_TOKENIZER
 
@@ -25,7 +25,7 @@ register_new_utf_errors()
 
 
 def create_tokenizer(path=PATH_TO_TOKENIZER):
-    tokenizer = AutoTokenizer.from_pretrained(path)
+    tokenizer = DebertaTokenizer.from_pretrained(path)
     tokenizer.add_special_tokens({"additional_special_tokens": ["[BR]"]})
     return tokenizer
 

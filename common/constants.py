@@ -3,7 +3,7 @@ import torch
 
 SEED = 42
 PATH_TO_SAVE_FINETUNED = "./deberta_v3_base"
-PATH_TO_TOKENIZER = "./kaggle/input/lal-deberta-base-v018/"
+PATH_TO_TOKENIZER = "microsoft/deberta-base"  # "./kaggle/input/lal-deberta-base-v018/"
 TRAIN_DATA_PATH = "./learning-agency-lab-automated-essay-scoring-2/train.csv"
 TRAIN_TEXT_PATH = "train_text.txt"
 VAL_TEXT_PATH = "val_text.txt"
