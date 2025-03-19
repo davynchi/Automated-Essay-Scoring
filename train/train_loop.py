@@ -10,11 +10,7 @@ from transformers import get_cosine_schedule_with_warmup, get_linear_schedule_wi
 from ..common.common import LOGGER
 from ..common.constants import DEVICE
 from ..common.dataset import LALDataset
-from ..common.model import (
-    CustomModel_attention,
-    CustomModel_lstm,
-    CustomModel_mean_pooling,
-)
+from ..common.model_utils import create_model
 from .funcs_for_training_and_validating import train_fn
 
 
@@ -107,37 +103,6 @@ def create_dataloaders(train_folds, valid_folds, valid_folds2, cfg):
     )
 
     return train_loader, valid_loader, valid_loader2
-
-
-def create_model(fold, cfg):
-    if cfg.sl:
-        if cfg.head == "mean_pooling":
-            model = CustomModel_mean_pooling(
-                cfg, config_path=cfg.config_path, pretrained=False
-            )
-        elif cfg.head == "attention":
-            model = CustomModel_attention(
-                cfg, config_path=cfg.config_path, pretrained=False
-            )
-        elif cfg.head == "lstm":
-            model = CustomModel_lstm(cfg, config_path=cfg.config_path, pretrained=False)
-        state = torch.load(
-            cfg.path + f"{cfg.model.replace('/', '-')}_fold{fold}_best.pth",
-            map_location=torch.device("cpu"),
-            weights_only=False,
-        )
-        model.load_state_dict(state["model"])
-    else:
-        if cfg.head == "mean_pooling":
-            model = CustomModel_mean_pooling(cfg, config_path=None, pretrained=True)
-        elif cfg.head == "attention":
-            model = CustomModel_attention(cfg, config_path=None, pretrained=True)
-        elif cfg.head == "lstm":
-            model = CustomModel_lstm(cfg, config_path=None, pretrained=True)
-    torch.save(model.config, cfg.path / "config.pth")
-    model.to(DEVICE)
-
-    return model
 
 
 def create_optimizer(model, cfg):

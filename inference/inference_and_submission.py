@@ -1,7 +1,6 @@
 import gc
 
 import numpy as np
-import pandas as pd
 import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -10,11 +9,7 @@ from transformers import DataCollatorWithPadding
 from ..common.cfg import CFG, CFG_LIST
 from ..common.constants import DEVICE
 from ..common.dataset import LALDataset, collate
-from ..common.model import (
-    CustomModel_attention,
-    CustomModel_lstm,
-    CustomModel_mean_pooling,
-)
+from ..common.model_utils import create_model, get_essay_score
 from ..common.modify_train_data import tokenize_text
 from .data_loading import load_data
 from .nelder_mead import calc_best_weights
@@ -64,24 +59,7 @@ def make_submission():
             )
             predictions = []
             for fold in cfg.trn_fold:
-                if cfg.head == "mean_pooling":
-                    model = CustomModel_mean_pooling(
-                        cfg, config_path=cfg.config_path, pretrained=False
-                    )
-                elif cfg.head == "attention":
-                    model = CustomModel_attention(
-                        cfg, config_path=cfg.config_path, pretrained=False
-                    )
-                elif cfg.head == "lstm":
-                    model = CustomModel_lstm(
-                        cfg, config_path=cfg.config_path, pretrained=False
-                    )
-                state = torch.load(
-                    cfg.path + f"{cfg.model.replace('/', '-')}_fold{fold}_best.pth",
-                    map_location=torch.device("cpu"),
-                    weights_only=False,
-                )
-                model.load_state_dict(state["model"])
+                model = create_model(fold, cfg)
                 prediction = inference_fn(test_loader, model, DEVICE)
                 predictions.append(prediction)
                 del model, state, prediction
@@ -99,14 +77,7 @@ def make_submission():
         test["pred"] = np.sum(
             bestWght * test[[f"pred_{j + 1}" for j in range(len(CFG_LIST))]], axis=1
         )
-        test["score"] = (
-            pd.cut(
-                test["pred"].values.reshape(-1) * 5,
-                [-np.inf, 0.83333333, 1.66666667, 2.5, 3.33333333, 4.16666667, np.inf],
-                labels=[0, 1, 2, 3, 4, 5],
-            ).astype(int)
-            + 1
-        )
+        test["score"] = get_essay_score(test["pred"].values) + 1
         submission = submission.drop(columns=["score"]).merge(
             test[["essay_id"] + ["score"]], on="essay_id", how="left"
         )

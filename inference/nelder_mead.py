@@ -4,7 +4,7 @@ import numpy as np
 from scipy.optimize import minimize
 
 from ..common.cfg import CFG, CFG_LIST
-from ..common.score import get_score
+from ..common.model_utils import get_score
 from .oof import get_oof_preds
 
 

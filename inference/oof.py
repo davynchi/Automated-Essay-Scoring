@@ -3,7 +3,7 @@ import gc
 import pandas as pd
 
 from ..common.cfg import CFG_LIST
-from ..common.score import get_score
+from ..common.model_utils import get_score
 
 
 def get_oof_preds():

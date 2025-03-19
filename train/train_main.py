@@ -3,8 +3,8 @@ import pandas as pd
 from ..common.cfg import CFG, CFG_LIST
 from ..common.common import LOGGER
 from ..common.constants import N_FOLDS, OOF_DIR, TRAIN_PICKLE_PATH
+from ..common.model_utils import get_score
 from ..common.modify_train_data import tokenize_text
-from ..common.score import get_score
 from .train_loop import train_loop
 
 

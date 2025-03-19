@@ -5,7 +5,7 @@ import torch
 
 from ..common.common import LOGGER
 from ..common.dataset import collate
-from ..common.score import get_score
+from ..common.model_utils import get_score
 from .helper import AverageMeter, timeSince
 
 
