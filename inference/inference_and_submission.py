@@ -7,13 +7,17 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import DataCollatorWithPadding
 
+from ..common.cfg import CFG, CFG_LIST
 from ..common.constants import DEVICE
+from ..common.dataset import TestDataset, collate
+from ..common.model import (
+    CustomModel_attention,
+    CustomModel_lstm,
+    CustomModel_mean_pooling,
+)
+from ..common.modify_train_data import tokenize_text
 from .data_loading import load_data
-from .dataset import TestDataset, collate
-from .make_cfg_list import CFG_LIST
-from .model import CustomModel_attention, CustomModel_lstm, CustomModel_mean_pooling
 from .nelder_mead import calc_best_weights
-from .tokenizer import tokenize_text
 
 
 def inference_fn(test_loader, model, device):
@@ -38,8 +42,10 @@ def inference_fn(test_loader, model, device):
 
 
 def make_submission():
+    CFG.sl = True
     test, submission = load_data()
-    tokenize_text(test)
+    test = test[:300]
+    tokenize_text(test, use_cfg_list=True)
     bestWght = calc_best_weights()
     predictions_list = []
     if len(test) > 10:
@@ -73,6 +79,7 @@ def make_submission():
                 state = torch.load(
                     cfg.path + f"{cfg.model.replace('/', '-')}_fold{fold}_best.pth",
                     map_location=torch.device("cpu"),
+                    weights_only=False,
                 )
                 model.load_state_dict(state["model"])
                 prediction = inference_fn(test_loader, model, DEVICE)
@@ -104,5 +111,4 @@ def make_submission():
             test[["essay_id"] + ["score"]], on="essay_id", how="left"
         )
 
-    # display(submission.head())
     submission[["essay_id"] + ["score"]].to_csv("submission.csv", index=False)

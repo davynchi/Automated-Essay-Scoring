@@ -29,6 +29,23 @@ class TestDataset(Dataset):
         return inputs
 
 
+class TrainDataset(Dataset):
+    def __init__(self, cfg, df):
+        self.cfg = cfg
+        self.texts = df["full_text"].values
+        self.labels = df[cfg.target_cols2].values
+        self.labels2 = df[cfg.target_cols3].values
+
+    def __len__(self):
+        return len(self.texts)
+
+    def __getitem__(self, item):
+        inputs = prepare_input(self.cfg, self.texts[item])
+        label = torch.tensor(self.labels[item], dtype=torch.float)
+        label2 = torch.tensor(self.labels2[item], dtype=torch.float)
+        return inputs, label, label2
+
+
 def collate(inputs):
     mask_len = int(inputs["attention_mask"].sum(axis=1).max())
     for k, _ in inputs.items():

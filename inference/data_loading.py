@@ -1,7 +1,7 @@
 import pandas as pd
 
-from ..common.basic_definitions import modify_texts
 from ..common.constants import INPUT_DIR_INFERENCE
+from ..common.utils import modify_texts
 
 
 def load_data():

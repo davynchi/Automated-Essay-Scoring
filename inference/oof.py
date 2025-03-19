@@ -2,13 +2,13 @@ import gc
 
 import pandas as pd
 
-from ..common.utils import get_score
-from .make_cfg_list import CFG_LIST
+from ..common.cfg import CFG_LIST
+from ..common.score import get_score
 
 
 def get_oof_preds():
     for i, cfg in enumerate(CFG_LIST):
-        oof_df = pd.read_pickle(cfg.oof_path + "oof_df.pkl")
+        oof_df = pd.read_pickle(cfg.oof_path / "oof_df.pkl")
         labels = oof_df[cfg.target_cols].values
         preds = oof_df["pred"].values
         score = get_score(labels, preds)

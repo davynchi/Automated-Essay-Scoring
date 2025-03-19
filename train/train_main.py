@@ -1,9 +1,10 @@
 import pandas as pd
 
-from ..common.cfg import CFG
+from ..common.cfg import CFG, CFG_LIST
 from ..common.common import LOGGER
-from ..common.constants import INPUT_DIR, OOF_DIR, OUTPUT_DIR
-from ..common.utils import get_score
+from ..common.constants import N_FOLDS, OOF_DIR, TRAIN_PICKLE_PATH
+from ..common.modify_train_data import tokenize_text
+from ..common.score import get_score
 from .train_loop import train_loop
 
 
@@ -18,7 +19,7 @@ def get_result(oof_df):
 
 
 def load_pickle_data():
-    train = pd.read_pickle(f"{INPUT_DIR}train.pkl")
+    train = pd.read_pickle(TRAIN_PICKLE_PATH)
     if CFG.sl:
         oof = pd.read_pickle(f"{OOF_DIR}oof_df.pkl")
         train = train.merge(oof[["essay_id", "pred"]], on="essay_id", how="left")
@@ -32,16 +33,18 @@ def load_pickle_data():
 
 
 def train_and_save_main_model():
-    if CFG.train:
-        train = load_pickle_data()
-        oof_df = pd.DataFrame()
-        for fold in range(CFG.n_fold):
-            if fold in CFG.trn_fold:
-                _oof_df = train_loop(train, fold)
-                oof_df = pd.concat([oof_df, _oof_df])
-                LOGGER.info(f"========== fold: {fold} result ==========")
-                get_result(_oof_df)
-        oof_df = oof_df.reset_index(drop=True)
-        LOGGER.info("========== CV ==========")
-        get_result(oof_df)
-        oof_df.to_pickle(OUTPUT_DIR + "oof_df.pkl")
+    for cfg in CFG_LIST:
+        if CFG.train:
+            train = load_pickle_data()
+            tokenize_text(train)
+            oof_df = pd.DataFrame()
+            for fold in range(N_FOLDS):
+                if fold in CFG.trn_fold:
+                    _oof_df = train_loop(train, fold, cfg)
+                    oof_df = pd.concat([oof_df, _oof_df])
+                    LOGGER.info(f"========== fold: {fold} result ==========")
+                    get_result(_oof_df)
+            oof_df = oof_df.reset_index(drop=True)
+            LOGGER.info("========== CV ==========")
+            get_result(oof_df)
+            oof_df.to_pickle(cfg.path / cfg.pickle_name)
