@@ -9,7 +9,7 @@ from transformers import DataCollatorWithPadding
 
 from ..common.cfg import CFG, CFG_LIST
 from ..common.constants import DEVICE
-from ..common.dataset import TestDataset, collate
+from ..common.dataset import LALDataset, collate
 from ..common.model import (
     CustomModel_attention,
     CustomModel_lstm,
@@ -50,7 +50,7 @@ def make_submission():
     predictions_list = []
     if len(test) > 10:
         for cfg in CFG_LIST:
-            test_dataset = TestDataset(cfg, test)
+            test_dataset = LALDataset(cfg, test, is_train=False)
             test_loader = DataLoader(
                 test_dataset,
                 batch_size=cfg.batch_size,

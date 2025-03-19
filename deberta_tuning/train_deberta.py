@@ -13,6 +13,7 @@ from ..common.constants import (
     BASE_PATH_TO_SAVE_FINETUNED,
     BLOCK_SIZE,
     CHECKPOINT_POSTFIX,
+    CHECKPOINTS_NAMES,
     NAMES_OF_MODEL_TO_FINETUNE,
     PATH_TO_TOKENIZER,
     TRAIN_TEXT_PATH,
@@ -28,8 +29,6 @@ def load_model(model_name):
 
 def finetune_and_save_existing_model():
     for model_key, model_name in NAMES_OF_MODEL_TO_FINETUNE.items():
-        if model_key == "large":
-            continue
         tokenizer = create_tokenizer(path=PATH_TO_TOKENIZER)
         model = load_model(model_name)
 

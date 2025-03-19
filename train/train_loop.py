@@ -9,7 +9,7 @@ from transformers import get_cosine_schedule_with_warmup, get_linear_schedule_wi
 
 from ..common.common import LOGGER
 from ..common.constants import DEVICE
-from ..common.dataset import TrainDataset
+from ..common.dataset import LALDataset
 from ..common.model import (
     CustomModel_attention,
     CustomModel_lstm,
@@ -77,9 +77,9 @@ def get_folds(folds, fold, cfg):
 
 
 def create_dataloaders(train_folds, valid_folds, valid_folds2, cfg):
-    train_dataset = TrainDataset(cfg, train_folds)
-    valid_dataset = TrainDataset(cfg, valid_folds)
-    valid_dataset2 = TrainDataset(cfg, valid_folds2)
+    train_dataset = LALDataset(cfg, train_folds, is_train=True)
+    valid_dataset = LALDataset(cfg, valid_folds, is_train=True)
+    valid_dataset2 = LALDataset(cfg, valid_folds2, is_train=True)
 
     train_loader = DataLoader(
         train_dataset,
@@ -112,13 +112,17 @@ def create_dataloaders(train_folds, valid_folds, valid_folds2, cfg):
 def create_model(fold, cfg):
     if cfg.sl:
         if cfg.head == "mean_pooling":
-            model = CustomModel_mean_pooling(cfg, config_path=None, pretrained=False)
+            model = CustomModel_mean_pooling(
+                cfg, config_path=cfg.config_path, pretrained=False
+            )
         elif cfg.head == "attention":
-            model = CustomModel_attention(cfg, config_path=None, pretrained=False)
+            model = CustomModel_attention(
+                cfg, config_path=cfg.config_path, pretrained=False
+            )
         elif cfg.head == "lstm":
-            model = CustomModel_lstm(cfg, config_path=None, pretrained=False)
+            model = CustomModel_lstm(cfg, config_path=cfg.config_path, pretrained=False)
         state = torch.load(
-            "/content/" + f"{cfg.model.replace('/', '-')}_fold{fold}_best.pth",
+            cfg.path + f"{cfg.model.replace('/', '-')}_fold{fold}_best.pth",
             map_location=torch.device("cpu"),
             weights_only=False,
         )

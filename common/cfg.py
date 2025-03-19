@@ -116,7 +116,8 @@ class CFG10(CFGLarge):
     head = "attention"
 
 
-CFG_LIST = [CFG1, CFG2, CFG3, CFG4, CFG5, CFG6, CFG7, CFG8, CFG9, CFG10]
+# CFG_LIST = [CFG1, CFG2, CFG3, CFG4, CFG5, CFG6, CFG7, CFG8, CFG9, CFG10]
+CFG_LIST = [CFG1, CFG2, CFG3, CFG7, CFG9]
 
 
 def create_paths_to_save():
