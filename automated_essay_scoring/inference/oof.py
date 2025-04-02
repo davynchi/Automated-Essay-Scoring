@@ -3,12 +3,13 @@ from pathlib import Path
 
 import pandas as pd
 
-from ..common.model_utils import get_score
+from ..common.constants import PICKLE_NAME
+from ..common.utils import get_score
 
 
 def get_oof_preds(cfg):
     for i, cfg_unit in enumerate(cfg.ensemble.values()):
-        oof_df = pd.read_pickle(Path(cfg_unit.path) / "oof_df.pkl")
+        oof_df = pd.read_pickle(Path(cfg_unit.path) / PICKLE_NAME)
         labels = oof_df[cfg_unit.base.target_cols].values
         preds = oof_df["pred"].values
         score = get_score(labels, preds)

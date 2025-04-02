@@ -7,11 +7,11 @@ from tqdm import tqdm
 from transformers import DataCollatorWithPadding
 
 from ..common.common import LOGGER
-from ..common.constants import DEVICE, SUBMISSION_FILE_NAME
+from ..common.constants import DEVICE, SUBMISSION_FILENAME, SUBMISSION_PATH
 from ..common.dataset import LALDataset, collate
 from ..common.model import create_model
-from ..common.model_utils import get_essay_score
 from ..common.modify_train_data import load_test_submission_data, tokenize_text
+from ..common.utils import get_essay_score
 from .nelder_mead import calc_best_weights_for_ensemble
 
 
@@ -76,5 +76,11 @@ def make_submission(cfg):
     submission = submission.drop(columns=["score"]).merge(
         test[["essay_id", "score"]], on="essay_id", how="left"
     )
-    submission[["essay_id", "score"]].to_csv(SUBMISSION_FILE_NAME, index=False)
-    LOGGER.info(f"Predicted scores are saved in the file {SUBMISSION_FILE_NAME}")
+
+    SUBMISSION_PATH.mkdir(parents=True, exist_ok=True)
+    submission[["essay_id", "score"]].to_csv(
+        SUBMISSION_PATH / SUBMISSION_FILENAME, index=False
+    )
+    LOGGER.info(
+        f"Predicted scores are saved in the file {SUBMISSION_PATH / SUBMISSION_FILENAME}"
+    )

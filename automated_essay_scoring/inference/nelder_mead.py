@@ -3,7 +3,7 @@ import gc
 import numpy as np
 from scipy.optimize import minimize
 
-from ..common.model_utils import get_score
+from ..common.utils import get_score
 from .oof import get_oof_preds
 
 

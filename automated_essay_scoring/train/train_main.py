@@ -4,8 +4,8 @@ import pandas as pd
 
 from ..common.common import LOGGER
 from ..common.constants import OOF_DIR, PICKLE_NAME, TRAIN_PICKLE_PATH
-from ..common.model_utils import get_score
 from ..common.modify_train_data import tokenize_text
+from ..common.utils import get_score
 from .train_loop import train_loop
 
 
@@ -22,7 +22,7 @@ def get_result(cfg, oof_df):
 def load_pickle_data(cfg, load_from_existed_pickle):
     train = pd.read_pickle(TRAIN_PICKLE_PATH)
     if load_from_existed_pickle:
-        oof = pd.read_pickle(f"{OOF_DIR}oof_df.pkl")
+        oof = pd.read_pickle(OOF_DIR / PICKLE_NAME)
         train = train.merge(oof[["essay_id", "pred"]], on="essay_id", how="left")
         train[cfg.base.target_cols3[0]] = (
             (train[cfg.base.target_cols2[0]].values / 5) * (1 - cfg.base.sl_rate)

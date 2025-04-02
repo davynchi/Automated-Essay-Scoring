@@ -7,19 +7,22 @@ import torch
 SEED = 42
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Technical paths (stable defaults)
-BASE_PATH_TO_SAVE_FINETUNED = Path("./pretrained_models")
-CACHED_DATA_DIR = Path("./cached_data")
-TRAIN_DATA_PATH = "./learning-agency-lab-automated-essay-scoring-2/train.csv"
-TRAIN_TEXT_PATH = CACHED_DATA_DIR / "train_text.txt"
-VAL_TEXT_PATH = CACHED_DATA_DIR / "val_text.txt"
-TRAIN_PICKLE_PATH = CACHED_DATA_DIR / "train.pkl"
-INPUT_DIR = "./kaggle/input/aes2-train-data/"
-OOF_DIR = ""
-OUTPUT_DIR = "./trained_models"
-INPUT_DIR_INFERENCE = "./learning-agency-lab-automated-essay-scoring-2/"
-OUTPUT_DIR_INFERENCE = "./"
-SUBMISSION_FILE_NAME = "submission.csv"
+OUTPUT_DIR_FINETUNED = Path("./pretrained_models")
+CACHED_DATA_PATH = Path("./cached_data")
+OUTPUT_DIR_TRAIN = Path("./trained_models")
+
+DATA_PATH = Path("./learning-agency-lab-automated-essay-scoring-2")
+TRAIN_FILENAME = "train.csv"
+TEST_FILENAME = "test.csv"
+SAMPLE_SUBMISSION_FILENAME = "sample_submission.csv"
+
+TRAIN_TEXT_PATH = CACHED_DATA_PATH / "train_text.txt"
+VAL_TEXT_PATH = CACHED_DATA_PATH / "val_text.txt"
+TRAIN_PICKLE_PATH = CACHED_DATA_PATH / "train.pkl"
+
+OOF_DIR = Path("./")
+SUBMISSION_PATH = Path("./")
+SUBMISSION_FILENAME = "submission.csv"
 
 NAMES_OF_MODELS = {
     "base": "microsoft/deberta-v3-base",

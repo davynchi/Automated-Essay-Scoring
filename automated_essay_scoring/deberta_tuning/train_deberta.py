@@ -10,9 +10,9 @@ from transformers import (
 )
 
 from ..common.constants import (
-    BASE_PATH_TO_SAVE_FINETUNED,
     CHECKPOINT_POSTFIX,
     NAMES_OF_MODELS,
+    OUTPUT_DIR_FINETUNED,
     PATH_TO_TOKENIZER,
     TRAIN_TEXT_PATH,
     VAL_TEXT_PATH,
@@ -48,7 +48,7 @@ def finetune_and_save_existing_model(cfg):
             tokenizer=tokenizer, **cfg.pretrain.collator
         )
 
-        PATH_TO_SAVE_MODEL = BASE_PATH_TO_SAVE_FINETUNED / (
+        PATH_TO_SAVE_MODEL = OUTPUT_DIR_FINETUNED / (
             model_name.replace("/", "-") + CHECKPOINT_POSTFIX
         )
 

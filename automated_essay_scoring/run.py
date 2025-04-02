@@ -2,9 +2,8 @@ import fire
 from hydra import compose, initialize
 from omegaconf import OmegaConf
 
-from .common.cfg_utils import create_paths
 from .common.modify_train_data import modify_train_data
-from .common.utils import register_new_utf_errors
+from .common.utils import create_paths, register_new_utf_errors
 from .deberta_tuning import finetune_and_save_existing_model
 from .inference import make_submission
 from .train import train_and_save_main_model
@@ -15,8 +14,7 @@ def train_and_submit_model():
         cfg = compose(config_name="defaults")
     OmegaConf.set_struct(cfg, False)
     create_paths(cfg)
-    # print("Final Configurations:")
-    # print(OmegaConf.to_yaml(cfg))
+    # print(f"Final Configurations: \n{OmegaConf.to_yaml(cfg)}")
 
     register_new_utf_errors()
 

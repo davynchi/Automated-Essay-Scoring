@@ -1,29 +1,23 @@
 import os
 import random
+from logging import INFO, FileHandler, Formatter, StreamHandler, getLogger
 
 import numpy as np
 import torch
 
-from .constants import OUTPUT_DIR, OUTPUT_DIR_INFERENCE, SEED
+from .constants import OUTPUT_DIR_TRAIN, SEED
 
-
-if not os.path.exists(OUTPUT_DIR):
-    os.makedirs(OUTPUT_DIR)
-
-if not os.path.exists(OUTPUT_DIR_INFERENCE):
-    os.makedirs(OUTPUT_DIR_INFERENCE)
 
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
 
-def setup_logger(filename=OUTPUT_DIR + "train"):
-    from logging import INFO, FileHandler, Formatter, StreamHandler, getLogger
-
+def setup_logger(filename=OUTPUT_DIR_TRAIN / "train.log"):
+    OUTPUT_DIR_TRAIN.mkdir(parents=True, exist_ok=True)
     logger = getLogger(__name__)
     logger.setLevel(INFO)
     handler1 = StreamHandler()
     handler1.setFormatter(Formatter("%(message)s"))
-    handler2 = FileHandler(filename=f"{filename}.log")
+    handler2 = FileHandler(filename=filename)
     handler2.setFormatter(Formatter("%(message)s"))
     logger.addHandler(handler1)
     logger.addHandler(handler2)
