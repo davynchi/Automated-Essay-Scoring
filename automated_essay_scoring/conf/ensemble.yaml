@@ -1,0 +1,6 @@
+defaults:
+  - ensemble/cfg1@cfg1
+  - ensemble/cfg2@cfg2
+  - ensemble/cfg6@cfg6
+  - ensemble/cfg7@cfg7
+  - ensemble/cfg9@cfg9

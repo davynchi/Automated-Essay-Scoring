@@ -1,0 +1,7 @@
+# defaults.yaml
+defaults:
+  - pretrain@pretrain
+  - ensemble/base@base
+  - ensemble@ensemble
+
+n_folds: 2

@@ -1,0 +1,8 @@
+# ensemble/cfg1.yaml
+defaults:
+  - base@base
+
+max_len: 1024
+head: "mean_pooling"
+model_key: "base"
+freeze_layer: 9

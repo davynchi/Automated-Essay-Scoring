@@ -3,14 +3,13 @@ import gc
 import numpy as np
 from scipy.optimize import minimize
 
-from ..common.cfg import CFG, CFG_LIST
 from ..common.model_utils import get_score
 from .oof import get_oof_preds
 
 
-def calc_best_weights():
-    df_oof = get_oof_preds()
-    y_values = df_oof[CFG.target_cols].values
+def calc_best_weights_for_ensemble(cfg):
+    df_oof = get_oof_preds(cfg)
+    y_values = df_oof[cfg.base.target_cols].values
 
     predictions = []
     lls = []
@@ -24,11 +23,12 @@ def calc_best_weights():
         score = get_score(y_values[train_idx], final_prediction)
         return -score
 
-    for i in range(len(CFG_LIST)):
+    num_models_in_ensemble = len(cfg.ensemble)
+    for i in range(num_models_in_ensemble):
         predictions.append(df_oof[f"pred_{i + 1}"].values)
 
-    for fold in range(CFG.n_fold):
-        starting_values = [1 / len(CFG_LIST)] * len(CFG_LIST)
+    for fold in range(cfg.n_folds):
+        starting_values = [1 / num_models_in_ensemble] * num_models_in_ensemble
         res = minimize(
             loss_func,
             starting_values,
@@ -50,7 +50,8 @@ def calc_best_weights():
     print("\n Best Weights: {weights:}".format(weights=bestWght))
 
     df_oof["blending"] = np.sum(
-        bestWght * df_oof[[f"pred_{j + 1}" for j in range(len(CFG_LIST))]], axis=1
+        bestWght * df_oof[[f"pred_{j + 1}" for j in range(num_models_in_ensemble)]],
+        axis=1,
     )
     print(get_score(y_values, df_oof["blending"].values))
     print(

@@ -4,9 +4,8 @@ import pandas as pd
 from sklearn.model_selection import GroupKFold, train_test_split
 from transformers import DebertaTokenizer
 
-from ..common.cfg import CFG, CFG_LIST
 from .constants import (
-    N_FOLDS,
+    INPUT_DIR_INFERENCE,
     PATH_TO_TOKENIZER,
     TRAIN_DATA_PATH,
     TRAIN_PICKLE_PATH,
@@ -23,9 +22,14 @@ def read_train_dataset():
     return train
 
 
-def divide_train_into_folds(
-    train, n_splits=N_FOLDS
-):  # n_splits=20): Так было, поправь потом
+def load_test_submission_data():
+    test = pd.read_csv(f"{INPUT_DIR_INFERENCE}test.csv")
+    submission = pd.read_csv(f"{INPUT_DIR_INFERENCE}sample_submission.csv")
+    modify_texts(test["full_text"])
+    return test, submission
+
+
+def divide_train_into_folds(train, n_splits):  # n_splits=20): Так было, поправь потом
     gkf = GroupKFold(n_splits=n_splits)
     train["fold"] = -1
 
@@ -50,28 +54,24 @@ def write_data_into_pickle(data, path):
     data_back.to_pickle(path)
 
 
-def create_tokenizer(path, use_cfg_list=False):
+def create_tokenizer(path):
     tokenizer = DebertaTokenizer.from_pretrained(path)
     tokenizer.add_special_tokens({"additional_special_tokens": ["[BR]"]})
-    if use_cfg_list:
-        for i in range(len(CFG_LIST)):
-            CFG_LIST[i].tokenizer = tokenizer
-    else:
-        CFG.tokenizer = tokenizer
     return tokenizer
 
 
-def tokenize_text(data, path_to_tokenizer=PATH_TO_TOKENIZER, use_cfg_list=False):
-    tokenizer = create_tokenizer(path=path_to_tokenizer, use_cfg_list=use_cfg_list)
+def tokenize_text(data, path_to_tokenizer=PATH_TO_TOKENIZER):
+    tokenizer = create_tokenizer(path=path_to_tokenizer)
 
     def text_encode(text):
         return len(tokenizer.encode(text))
 
     data["length"] = data["full_text"].map(text_encode)
     data = data.sort_values("length", ascending=True).reset_index(drop=True)
+    return tokenizer
 
 
-def divide_train_into_train_and_val(train):
+def divide_train_into_train_and_val_by_fold(train):
     train_text = "\n".join(train.loc[train["fold"] != 0, "text"].tolist())
     val_text = "\n".join(train.loc[train["fold"] == 0, "text"].tolist())
     return train_text, val_text
@@ -84,13 +84,12 @@ def write_train_and_val(train_text, val_text):
         f.write(val_text)
 
 
-def modify_train_data():
+def modify_train_data(cfg):
     train = read_train_dataset()
     train = train[:24]
     modify_texts(train["text"])
-    divide_train_into_folds(train)
+    divide_train_into_folds(train, n_splits=cfg.n_folds)
     divide_train_into_train_and_two_validations(train)
-    # print(train)
     write_data_into_pickle(train, TRAIN_PICKLE_PATH)
-    train_text, val_text = divide_train_into_train_and_val(train)
+    train_text, val_text = divide_train_into_train_and_val_by_fold(train)
     write_train_and_val(train_text, val_text)

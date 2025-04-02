@@ -18,9 +18,6 @@ def register_new_utf_errors():
     codecs.register_error("replace_decoding_with_cp1252", replace_decoding_with_cp1252)
 
 
-register_new_utf_errors()
-
-
 def resolve_encodings_and_normalize(text: str) -> str:
     """Resolve the encoding problems and normalize the abnormal characters."""
     text = (

@@ -1,3 +1,9 @@
+learning-agency-lab-automated-essay-scoring-2
+cached_data
+trained_models
+pretrained_models
+submission.csv
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

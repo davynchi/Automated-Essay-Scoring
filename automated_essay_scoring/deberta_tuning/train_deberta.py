@@ -11,10 +11,8 @@ from transformers import (
 
 from ..common.constants import (
     BASE_PATH_TO_SAVE_FINETUNED,
-    BLOCK_SIZE,
     CHECKPOINT_POSTFIX,
-    CHECKPOINTS_NAMES,
-    NAMES_OF_MODEL_TO_FINETUNE,
+    NAMES_OF_MODELS,
     PATH_TO_TOKENIZER,
     TRAIN_TEXT_PATH,
     VAL_TEXT_PATH,
@@ -27,25 +25,27 @@ def load_model(model_name):
     return model
 
 
-def finetune_and_save_existing_model():
-    for model_key, model_name in NAMES_OF_MODEL_TO_FINETUNE.items():
+def finetune_and_save_existing_model(cfg):
+    checkpoints_names = {}
+    for model_key, model_name in NAMES_OF_MODELS.items():
         tokenizer = create_tokenizer(path=PATH_TO_TOKENIZER)
         model = load_model(model_name)
 
+        block_size = cfg.pretrain.line_by_line_text_dataset.block_size
         train_dataset = LineByLineTextDataset(
             tokenizer=tokenizer,
             file_path=TRAIN_TEXT_PATH,  # mention train text file here
-            block_size=BLOCK_SIZE,
+            block_size=block_size,
         )
 
         valid_dataset = LineByLineTextDataset(
             tokenizer=tokenizer,
             file_path=VAL_TEXT_PATH,  # mention valid text file here
-            block_size=BLOCK_SIZE,
+            block_size=block_size,
         )
 
         data_collator = DataCollatorForLanguageModeling(
-            tokenizer=tokenizer, mlm=True, mlm_probability=0.15
+            tokenizer=tokenizer, **cfg.pretrain.collator
         )
 
         PATH_TO_SAVE_MODEL = BASE_PATH_TO_SAVE_FINETUNED / (
@@ -53,21 +53,7 @@ def finetune_and_save_existing_model():
         )
 
         training_args = TrainingArguments(
-            output_dir=PATH_TO_SAVE_MODEL,
-            overwrite_output_dir=True,
-            num_train_epochs=2,  # 8,  -- Было столько
-            per_device_train_batch_size=1,
-            evaluation_strategy="steps",
-            save_total_limit=0,
-            save_strategy="steps",
-            save_steps=3614,  # 14456,-- Было столько
-            eval_steps=1807,  # 7228, -- Было столько
-            fp16=True,  # Этой опции не было изначально
-            metric_for_best_model="eval_loss",
-            greater_is_better=False,
-            load_best_model_at_end=True,
-            prediction_loss_only=True,
-            report_to="none",
+            output_dir=PATH_TO_SAVE_MODEL, **cfg.pretrain.training_arguments
         )
 
         trainer = Trainer(
@@ -81,8 +67,9 @@ def finetune_and_save_existing_model():
         trainer.train()
         # trainer.save_model(PATH_TO_SAVE_MODEL)
 
-        global CHECKPOINTS_NAMES
-        CHECKPOINTS_NAMES[model_key] = f"checkpoint-{trainer.state.global_step}"
+        checkpoints_names[model_key] = f"checkpoint-{trainer.state.global_step}"
 
         torch.cuda.empty_cache()
         gc.collect()
+
+    return checkpoints_names, tokenizer

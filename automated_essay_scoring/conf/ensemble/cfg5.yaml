@@ -1,0 +1,8 @@
+# ensemble/cfg2.yaml
+defaults:
+  - base@base
+
+max_len: 1536
+head: "attention"
+model_key: "base"
+freeze_layer: 9

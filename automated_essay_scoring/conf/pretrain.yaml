@@ -1,0 +1,22 @@
+line_by_line_text_dataset:
+  block_size: 64
+
+collator:
+  mlm: True
+  mlm_probability: 0.15
+
+training_arguments:
+  overwrite_output_dir: True
+  num_train_epochs: 2 # 8,  -- Было столько
+  per_device_train_batch_size: 1
+  evaluation_strategy: "steps"
+  save_total_limit: 0
+  save_strategy: "steps"
+  save_steps: 3614 # 14456,-- Было столько
+  eval_steps: 1807 # 7228, -- Было столько
+  fp16: True # Этой опции не было изначально
+  metric_for_best_model: "eval_loss"
+  greater_is_better: False
+  load_best_model_at_end: True
+  prediction_loss_only: True
+  report_to: "none"

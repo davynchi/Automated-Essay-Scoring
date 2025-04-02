@@ -1,9 +1,11 @@
 import time
+from pathlib import Path
 
 import numpy as np
 import torch
 
 from ..common.common import LOGGER
+from ..common.constants import NAMES_OF_MODELS
 from ..common.dataset import collate
 from ..common.model_utils import get_score
 from .helper import AverageMeter, timeSince
@@ -24,11 +26,11 @@ def valid_fn(valid_loader, valid_loader2, model, criterion, device, cfg):
             y_preds = model(inputs)
             loss = criterion(y_preds, labels2)
         batch_size = labels2.size(0)
-        if cfg.gradient_accumulation_steps > 1:
-            loss = loss / cfg.gradient_accumulation_steps
+        if cfg.base.gradient_accumulation_steps > 1:
+            loss = loss / cfg.base.gradient_accumulation_steps
         losses.update(loss.item(), batch_size)
         preds.append(y_preds.sigmoid().to("cpu").numpy())
-        if step % cfg.print_freq == 0 or step == (len(valid_loader) - 1):
+        if step % cfg.base.print_freq == 0 or step == (len(valid_loader) - 1):
             print(
                 "EVAL: [{0}/{1}] "
                 "Elapsed {remain:s} "
@@ -73,7 +75,7 @@ def train_fn(
     cfg,
 ):
     model.train()
-    scaler = torch.cuda.amp.GradScaler(enabled=cfg.apex)
+    scaler = torch.cuda.amp.GradScaler(enabled=cfg.base.apex)
     losses = AverageMeter()
     start = time.time()
     global_step = 0
@@ -81,7 +83,7 @@ def train_fn(
     train_labels = []
     for step, (inputs, labels, labels2) in enumerate(train_loader):
         print("step:", step)
-        with torch.cuda.amp.autocast(enabled=cfg.apex):
+        with torch.cuda.amp.autocast(enabled=cfg.base.apex):
             inputs = collate(inputs)
             for k, v in inputs.items():
                 inputs[k] = v.to(device)
@@ -90,25 +92,25 @@ def train_fn(
             batch_size = labels.size(0)
             y_preds = model(inputs)
             loss = criterion(y_preds, labels2)
-        if cfg.gradient_accumulation_steps > 1:
-            loss = loss / cfg.gradient_accumulation_steps
+        if cfg.base.gradient_accumulation_steps > 1:
+            loss = loss / cfg.base.gradient_accumulation_steps
         losses.update(loss.item(), batch_size)
         preds.append(y_preds.sigmoid().detach().to("cpu").numpy())
         train_labels.append(labels.detach().to("cpu").numpy())
         scaler.scale(loss).backward()
         # awp.attack_backward(inputs, labels, epoch)
-        if (step + 1) % cfg.gradient_accumulation_steps == 0:
+        if (step + 1) % cfg.base.gradient_accumulation_steps == 0:
             scaler.unscale_(optimizer)
-            torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.max_grad_norm)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.base.max_grad_norm)
             scaler.step(optimizer)
             scaler.update()
             optimizer.zero_grad()
             global_step += 1
-            if cfg.batch_scheduler:
+            if cfg.base.batch_scheduler:
                 scheduler.step()
-        if step % (cfg.print_freq * cfg.gradient_accumulation_steps) == 0 or step == (
-            len(train_loader) - 1
-        ):
+        if step % (
+            cfg.base.print_freq * cfg.base.gradient_accumulation_steps
+        ) == 0 or step == (len(train_loader) - 1):
             print(
                 "Epoch: [{0}][{1}/{2}] "
                 "Elapsed {remain:s} "
@@ -148,7 +150,8 @@ def train_fn(
                     )
                     torch.save(
                         {"model": model.state_dict(), "predictions": predictions},
-                        cfg.path / f"{cfg.model.replace('/', '-')}_fold{fold}_best.pth",
+                        Path(cfg.path)
+                        / f"{NAMES_OF_MODELS[cfg.model_key].replace('/', '-')}_fold{fold}_best.pth",
                     )
 
     return best_score
