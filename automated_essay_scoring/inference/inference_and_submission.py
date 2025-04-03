@@ -6,12 +6,11 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import DataCollatorWithPadding
 
-from ..common.common import LOGGER
 from ..common.constants import DEVICE, SUBMISSION_FILENAME, SUBMISSION_PATH
 from ..common.dataset import LALDataset, collate
 from ..common.model import create_model
 from ..common.modify_train_data import load_test_submission_data, tokenize_text
-from ..common.utils import get_essay_score
+from ..common.utils import LOGGER, get_essay_score
 from .nelder_mead import calc_best_weights_for_ensemble
 
 

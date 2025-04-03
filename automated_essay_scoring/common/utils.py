@@ -1,12 +1,44 @@
 import codecs
+import os
+import random
+from logging import INFO, FileHandler, Formatter, StreamHandler, getLogger
 from typing import Tuple
 
 import numpy as np
 import pandas as pd
+import torch
 from sklearn.metrics import cohen_kappa_score
 from text_unidecode import unidecode
 
-from .constants import OUTPUT_DIR_TRAIN
+from .constants import OUTPUT_DIR_TRAIN, SEED
+
+
+os.environ["TOKENIZERS_PARALLELISM"] = "true"
+
+
+def setup_logger(filename=OUTPUT_DIR_TRAIN / "train.log"):
+    OUTPUT_DIR_TRAIN.mkdir(parents=True, exist_ok=True)
+    logger = getLogger(__name__)
+    logger.setLevel(INFO)
+    handler1 = StreamHandler()
+    handler1.setFormatter(Formatter("%(message)s"))
+    handler2 = FileHandler(filename=filename)
+    handler2.setFormatter(Formatter("%(message)s"))
+    logger.addHandler(handler1)
+    logger.addHandler(handler2)
+    return logger
+
+
+LOGGER = setup_logger()
+
+
+def seed_everything(seed=SEED):
+    random.seed(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
 
 
 def replace_encoding_with_utf8(error: UnicodeError) -> Tuple[bytes, int]:
@@ -35,7 +67,7 @@ def resolve_encodings_and_normalize(text: str) -> str:
     return text
 
 
-def modify_texts(texts):  # Раньше было train['text']
+def modify_texts(texts):
     texts = texts.apply(lambda x: resolve_encodings_and_normalize(x))
     texts = [text.replace("\n", "[BR]") for text in texts]
 

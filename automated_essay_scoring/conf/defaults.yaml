@@ -1,5 +1,5 @@
-# defaults.yaml
 defaults:
+  - _self_
   - pretrain@pretrain
   - ensemble/base@base
   - ensemble@ensemble

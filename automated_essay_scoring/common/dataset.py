@@ -17,8 +17,8 @@ class LALDataset(Dataset):
             text,
             return_tensors=None,
             add_special_tokens=True,
+            padding="max_length",
             max_length=self.cfg.max_len,
-            pad_to_max_length=True,
             truncation=True,
         )
         for k, v in inputs.items():

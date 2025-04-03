@@ -1,10 +1,10 @@
 import gc
 
 import torch
+from datasets import load_dataset
 from transformers import (
     DataCollatorForLanguageModeling,
     DebertaV2ForMaskedLM,
-    LineByLineTextDataset,
     Trainer,
     TrainingArguments,
 )
@@ -32,16 +32,22 @@ def finetune_and_save_existing_model(cfg):
         model = load_model(model_name)
 
         block_size = cfg.pretrain.line_by_line_text_dataset.block_size
-        train_dataset = LineByLineTextDataset(
-            tokenizer=tokenizer,
-            file_path=TRAIN_TEXT_PATH,  # mention train text file here
-            block_size=block_size,
-        )
 
-        valid_dataset = LineByLineTextDataset(
-            tokenizer=tokenizer,
-            file_path=VAL_TEXT_PATH,  # mention valid text file here
-            block_size=block_size,
+        # Load raw text datasets using the datasets library
+        raw_train_dataset = load_dataset(
+            "text", data_files={"train": str(TRAIN_TEXT_PATH)}
+        )
+        raw_valid_dataset = load_dataset("text", data_files={"train": str(VAL_TEXT_PATH)})
+
+        # Tokenize datasets with loop variables bound as default arguments
+        def tokenize_function(examples, tokenizer=tokenizer, block_size=block_size):
+            return tokenizer(examples["text"], truncation=True, max_length=block_size)
+
+        tokenized_train_dataset = raw_train_dataset["train"].map(
+            tokenize_function, batched=True, remove_columns=["text"]
+        )
+        tokenized_valid_dataset = raw_valid_dataset["train"].map(
+            tokenize_function, batched=True, remove_columns=["text"]
         )
 
         data_collator = DataCollatorForLanguageModeling(
@@ -60,12 +66,11 @@ def finetune_and_save_existing_model(cfg):
             model=model,
             args=training_args,
             data_collator=data_collator,
-            train_dataset=train_dataset,
-            eval_dataset=valid_dataset,
+            train_dataset=tokenized_train_dataset,
+            eval_dataset=tokenized_valid_dataset,
         )
 
         trainer.train()
-        # trainer.save_model(PATH_TO_SAVE_MODEL)
 
         checkpoints_names[model_key] = f"checkpoint-{trainer.state.global_step}"
 

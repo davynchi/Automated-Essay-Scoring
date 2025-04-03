@@ -2,10 +2,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from ..common.common import LOGGER
 from ..common.constants import OOF_DIR, PICKLE_NAME, TRAIN_PICKLE_PATH
 from ..common.modify_train_data import tokenize_text
-from ..common.utils import get_score
+from ..common.utils import LOGGER, get_score
 from .train_loop import train_loop
 
 

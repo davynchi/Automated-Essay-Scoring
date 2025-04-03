@@ -4,56 +4,82 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from ..common.common import LOGGER
-from ..common.constants import NAMES_OF_MODELS
+from ..common.constants import DEVICE, NAMES_OF_MODELS
 from ..common.dataset import collate
-from ..common.utils import get_score
+from ..common.utils import LOGGER, get_score
 from .helper import AverageMeter, timeSince
 
 
-def valid_fn(valid_loader, valid_loader2, model, criterion, device, cfg):
+def _move_to_device(data, device):
+    """
+    Recursively move tensor data to the specified device.
+
+    Args:
+        data (dict or torch.Tensor): Input data.
+        device (torch.device): Device to move the data to.
+
+    Returns:
+        Data moved to the specified device.
+    """
+    if isinstance(data, dict):
+        return {k: v.to(device) for k, v in data.items()}
+    return data.to(device)
+
+
+def valid_fn(valid_loader, valid_loader2, model, criterion, cfg):
+    """
+    Validate the model on two separate validation loaders.
+
+    Args:
+        valid_loader (DataLoader): Primary validation data loader.
+        valid_loader2 (DataLoader): Secondary validation data loader.
+        model (torch.nn.Module): The model to evaluate.
+        criterion: Loss function.
+        cfg: Configuration object.
+
+    Returns:
+        Tuple[float, np.array, np.array]:
+            - Average loss over valid_loader,
+            - Predictions from valid_loader,
+            - Predictions from valid_loader2.
+    """
     losses = AverageMeter()
     model.eval()
-    preds = []
-    start = time.time()
+    all_preds = []
+    start_time = time.time()
+
+    # Process first validation loader with loss computation and logging.
     for step, (inputs, _, labels2) in enumerate(valid_loader):
-        print(f"val step: {step}")
         with torch.no_grad():
             inputs = collate(inputs)
-            for k, v in inputs.items():
-                inputs[k] = v.to(device)
-            labels2 = labels2.to(device)
-            y_preds = model(inputs)
-            loss = criterion(y_preds, labels2)
-        batch_size = labels2.size(0)
-        if cfg.base.gradient_accumulation_steps > 1:
-            loss = loss / cfg.base.gradient_accumulation_steps
-        losses.update(loss.item(), batch_size)
-        preds.append(y_preds.sigmoid().to("cpu").numpy())
-        if step % cfg.base.print_freq == 0 or step == (len(valid_loader) - 1):
-            print(
-                "EVAL: [{0}/{1}] "
-                "Elapsed {remain:s} "
-                "Loss: {loss.val:.4f}({loss.avg:.4f}) ".format(
-                    step,
-                    len(valid_loader),
-                    loss=losses,
-                    remain=timeSince(start, float(step + 1) / len(valid_loader)),
-                )
-            )
-    predictions = np.concatenate(preds)
+            inputs = _move_to_device(inputs, DEVICE)
+            labels2 = labels2.to(DEVICE)
+            outputs = model(inputs)
+            loss = criterion(outputs, labels2)
+            if cfg.base.gradient_accumulation_steps > 1:
+                loss /= cfg.base.gradient_accumulation_steps
+            batch_size = labels2.size(0)
+            losses.update(loss.item(), batch_size)
+            all_preds.append(outputs.sigmoid().to("cpu").numpy())
 
-    preds = []
+            if step % cfg.base.print_freq == 0 or step == (len(valid_loader) - 1):
+                print(
+                    f"EVAL: [{step}/{len(valid_loader)}] "
+                    f"Elapsed {timeSince(start_time, (step + 1) / len(valid_loader))} "
+                    f"Loss: {losses.val:.4f}({losses.avg:.4f})"
+                )
+    predictions = np.concatenate(all_preds)
+
+    # Process second validation loader for predictions only.
+    all_preds_2 = []
     for _, (inputs, _, labels2) in enumerate(valid_loader2):
         with torch.no_grad():
             inputs = collate(inputs)
-            for k, v in inputs.items():
-                inputs[k] = v.to(device)
-            labels2 = labels2.to(device)
-            y_preds = model(inputs)
-        batch_size = labels2.size(0)
-        preds.append(y_preds.sigmoid().to("cpu").numpy())
-    predictions2 = np.concatenate(preds)
+            inputs = _move_to_device(inputs, DEVICE)
+            labels2 = labels2.to(DEVICE)
+            outputs = model(inputs)
+            all_preds_2.append(outputs.sigmoid().to("cpu").numpy())
+    predictions2 = np.concatenate(all_preds_2)
 
     return losses.avg, predictions, predictions2
 
@@ -70,35 +96,56 @@ def train_fn(
     optimizer,
     epoch,
     scheduler,
-    device,
     best_score,
     cfg,
 ):
+    """
+    Train the model for one epoch and validate at the end.
+
+    Args:
+        fold (int): Current fold number.
+        train_loader (DataLoader): Training data loader.
+        valid_loader (DataLoader): Primary validation data loader.
+        valid_labels (np.array): Ground truth labels for primary validation.
+        valid_loader2 (DataLoader): Secondary validation data loader.
+        valid_labels2 (np.array): Ground truth labels for secondary validation.
+        model (torch.nn.Module): The model to train.
+        criterion: Loss function.
+        optimizer: Optimizer.
+        epoch (int): Current epoch number.
+        scheduler: Learning rate scheduler.
+        best_score (float): Best score achieved so far.
+        cfg: Configuration object.
+
+    Returns:
+        float: Updated best score.
+    """
     model.train()
-    scaler = torch.cuda.amp.GradScaler(enabled=cfg.base.apex)
+    scaler = torch.amp.GradScaler(DEVICE.type, enabled=cfg.base.apex)
     losses = AverageMeter()
-    start = time.time()
+    start_time = time.time()
     global_step = 0
-    preds = []
-    train_labels = []
+    all_preds = []
+    all_train_labels = []
+
     for step, (inputs, labels, labels2) in enumerate(train_loader):
-        print("step:", step)
-        with torch.cuda.amp.autocast(enabled=cfg.base.apex):
+        with torch.amp.autocast(DEVICE.type, enabled=cfg.base.apex):
             inputs = collate(inputs)
-            for k, v in inputs.items():
-                inputs[k] = v.to(device)
-            labels = labels.to(device)
-            labels2 = labels2.to(device)
+            inputs = _move_to_device(inputs, DEVICE)
+            labels = labels.to(DEVICE)
+            labels2 = labels2.to(DEVICE)
             batch_size = labels.size(0)
-            y_preds = model(inputs)
-            loss = criterion(y_preds, labels2)
-        if cfg.base.gradient_accumulation_steps > 1:
-            loss = loss / cfg.base.gradient_accumulation_steps
+            outputs = model(inputs)
+            loss = criterion(outputs, labels2)
+            if cfg.base.gradient_accumulation_steps > 1:
+                loss /= cfg.base.gradient_accumulation_steps
+
         losses.update(loss.item(), batch_size)
-        preds.append(y_preds.sigmoid().detach().to("cpu").numpy())
-        train_labels.append(labels.detach().to("cpu").numpy())
+        all_preds.append(outputs.sigmoid().detach().to("cpu").numpy())
+        all_train_labels.append(labels.detach().to("cpu").numpy())
+
         scaler.scale(loss).backward()
-        # awp.attack_backward(inputs, labels, epoch)
+
         if (step + 1) % cfg.base.gradient_accumulation_steps == 0:
             scaler.unscale_(optimizer)
             torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.base.max_grad_norm)
@@ -108,34 +155,30 @@ def train_fn(
             global_step += 1
             if cfg.base.batch_scheduler:
                 scheduler.step()
+
+        # Print training progress and perform validation at the end of the epoch.
         if step % (
             cfg.base.print_freq * cfg.base.gradient_accumulation_steps
         ) == 0 or step == (len(train_loader) - 1):
+            current_lr = scheduler.get_lr()[0]
             print(
-                "Epoch: [{0}][{1}/{2}] "
-                "Elapsed {remain:s} "
-                "Loss: {loss.val:.4f}({loss.avg:.4f}) "
-                "LR: {lr:.8f}  ".format(
-                    epoch + 1,
-                    step,
-                    len(train_loader),
-                    remain=timeSince(start, float(step + 1) / len(train_loader)),
-                    loss=losses,
-                    lr=scheduler.get_lr()[0],
-                )
+                f"Epoch: [{epoch + 1}][{step} / {len(train_loader)}] "
+                f"Elapsed {timeSince(start_time, (step + 1) / len(train_loader))} "
+                f"Loss: {losses.val:.4f}({losses.avg:.4f}) "
+                f"LR: {current_lr:.8f}"
             )
 
-            if step > len(train_loader) - 2:  # как было изначально, поправь потом!
-                # if True:
-                predictions = np.concatenate(preds).astype(np.float32)
-                train_labels = np.concatenate(train_labels)
-                train_score = get_score(train_labels, predictions)
-                avg_val_loss, predictions, predictions2 = valid_fn(
-                    valid_loader, valid_loader2, model, criterion, device, cfg
+            # Trigger validation near the end of the epoch.
+            if step > len(train_loader) - 2:
+                predictions = np.concatenate(all_preds).astype(np.float32)
+                train_labels_arr = np.concatenate(all_train_labels)
+                train_score = get_score(train_labels_arr, predictions)
+                avg_val_loss, val_predictions, val_predictions2 = valid_fn(
+                    valid_loader, valid_loader2, model, criterion, cfg
                 )
-                score = get_score(valid_labels, predictions)
-                score2 = get_score(valid_labels2, predictions2)
-                elapsed = time.time() - start
+                score = get_score(valid_labels, val_predictions)
+                score2 = get_score(valid_labels2, val_predictions2)
+                elapsed = time.time() - start_time
                 LOGGER.info(
                     f"Epoch_Step {epoch + 1}_{step} - avg_train_loss: {losses.avg:.4f}  avg_val_loss: {avg_val_loss:.4f}  time: {elapsed:.0f}s"
                 )
@@ -146,12 +189,15 @@ def train_fn(
                 if best_score < score2:
                     best_score = score2
                     LOGGER.info(
-                        f"Epoch_Step {epoch + 1}_{step} - Save Best Score: {best_score:.4f} Model\n"
+                        f"Epoch_Step {epoch + 1}_{step} - Save Best Score: {best_score:.4f} Model"
+                    )
+                    model_path = (
+                        Path(cfg.path)
+                        / f"{NAMES_OF_MODELS[cfg.model_key].replace('/', '-')}_fold{fold}_best.pth"
                     )
                     torch.save(
-                        {"model": model.state_dict(), "predictions": predictions},
-                        Path(cfg.path)
-                        / f"{NAMES_OF_MODELS[cfg.model_key].replace('/', '-')}_fold{fold}_best.pth",
+                        {"model": model.state_dict(), "predictions": val_predictions},
+                        model_path,
                     )
 
     return best_score

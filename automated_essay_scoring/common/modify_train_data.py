@@ -36,7 +36,7 @@ def divide_train_into_folds(train, n_splits):
         train.loc[val_, "fold"] = fold
 
 
-def divide_train_into_train_and_two_validations(cfg, train):
+def set_flag_in_each_fold(cfg, train):
     train["flag"] = -1
 
     for fold_value in train["fold"].unique():
@@ -87,7 +87,7 @@ def modify_train_data(cfg):
     train = train[:24]
     modify_texts(train["text"])
     divide_train_into_folds(train, n_splits=cfg.n_folds)
-    divide_train_into_train_and_two_validations(cfg, train)
+    set_flag_in_each_fold(cfg, train)
     write_data_into_pickle(train, TRAIN_PICKLE_PATH)
     train_text, val_text = divide_train_into_train_and_val_by_fold(train)
     write_train_and_val(train_text, val_text)
