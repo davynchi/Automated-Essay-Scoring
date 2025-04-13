@@ -15,12 +15,12 @@ DATA_PATH = Path("./learning-agency-lab-automated-essay-scoring-2")
 TRAIN_FILENAME = "train.csv"
 TEST_FILENAME = "test.csv"
 SAMPLE_SUBMISSION_FILENAME = "sample_submission.csv"
+PROMPTED_DATA_FILENAME = "persuade_2.0_human_scores_demo_id_github.csv"
 
 TRAIN_TEXT_PATH = CACHED_DATA_PATH / "train_text.txt"
 VAL_TEXT_PATH = CACHED_DATA_PATH / "val_text.txt"
 TRAIN_PICKLE_PATH = CACHED_DATA_PATH / "train.pkl"
 
-OOF_DIR = Path("./")
 SUBMISSION_PATH = Path("./")
 SUBMISSION_FILENAME = "submission.csv"
 

@@ -23,17 +23,16 @@ target_size: 1
 target_cols: "score"
 target_cols2: ["score"]
 target_cols3: ["score_s"]
-# max_len: 1024
 weight_decay: 0.01
 gradient_accumulation_steps: 1
 max_grad_norm: 1000
-# n_fold: 6 -- так было
-trn_fold: [0, 1] # trn_fold = [0] -- так было
 freeze_layer: 9
+sl_rate: 0.2
+flag: 0
+# n_fold: 6 -- так было
+# trn_fold = [0] -- так было в CFG в 1ом ноутбуке
 # head: "mean_pooling"  # 'mean_pooling' 'attention' 'lstm'
 # sl: False  # This parameter changes in the code, change the behaviour!
-sl_rate: 0.2
-train: True
-flag: 0
+# train: True
+# max_len: 1024
 # trn_fold = [0, 1, 2, 3, 4, 5] # -- так было в CFG во 2ом ноутбуке
-# Тут еще был sl --  переправь логику в файле!

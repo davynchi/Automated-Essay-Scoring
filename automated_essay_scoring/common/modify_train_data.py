@@ -1,10 +1,11 @@
 import pandas as pd
-from sklearn.model_selection import GroupKFold, train_test_split
+from iterstrat.ml_stratifiers import MultilabelStratifiedKFold
 from transformers import DebertaTokenizer
 
 from .constants import (
     DATA_PATH,
     PATH_TO_TOKENIZER,
+    PROMPTED_DATA_FILENAME,
     SAMPLE_SUBMISSION_FILENAME,
     TEST_FILENAME,
     TRAIN_FILENAME,
@@ -29,21 +30,23 @@ def load_test_submission_data():
 
 
 def divide_train_into_folds(train, n_splits):
-    gkf = GroupKFold(n_splits=n_splits)
+    mskf = MultilabelStratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
     train["fold"] = -1
+    train.loc[train["prompt_name"].isna(), "prompt_name"] = "Unknown prompt name"
 
-    for fold, (_, val_) in enumerate(gkf.split(train, train, groups=train["id"])):
+    for fold, (_, val_) in enumerate(mskf.split(train, train[["prompt_name", "score"]])):
         train.loc[val_, "fold"] = fold
 
 
-def set_flag_in_each_fold(cfg, train):
-    train["flag"] = -1
+def set_flag_using_prompted_data(train):
+    prompted_data = pd.read_csv(DATA_PATH / PROMPTED_DATA_FILENAME)
+    merged_data = pd.merge(
+        train, prompted_data, left_on="text", right_on="full_text", how="left"
+    )
 
-    for fold_value in train["fold"].unique():
-        fold_indices = train.index[train["fold"] == fold_value]
-        flag_0, flag_1 = train_test_split(fold_indices, test_size=cfg.test_fraction)
-        train.loc[flag_0, "flag"] = 0
-        train.loc[flag_1, "flag"] = 1
+    merged_data["flag"] = 0
+    merged_data.loc[merged_data["prompt_name"].isna(), "flag"] = 1
+    return merged_data
 
 
 def write_data_into_pickle(data, file_path):
@@ -84,10 +87,11 @@ def write_train_and_val(train_text, val_text):
 
 def modify_train_data(cfg):
     train = read_train_dataset()
-    train = train[:24]
+    train = train[:72]
     modify_texts(train["text"])
+    train = set_flag_using_prompted_data(train)
     divide_train_into_folds(train, n_splits=cfg.n_folds)
-    set_flag_in_each_fold(cfg, train)
+    train = train[["id", "text", "score", "flag", "fold"]]
     write_data_into_pickle(train, TRAIN_PICKLE_PATH)
     train_text, val_text = divide_train_into_train_and_val_by_fold(train)
     write_train_and_val(train_text, val_text)

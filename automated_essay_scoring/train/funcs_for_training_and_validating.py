@@ -1,12 +1,11 @@
 import time
-from pathlib import Path
 
 import numpy as np
 import torch
 
-from ..common.constants import DEVICE, NAMES_OF_MODELS
+from ..common.constants import DEVICE
 from ..common.dataset import collate
-from ..common.utils import LOGGER, get_score
+from ..common.utils import LOGGER, get_model_path, get_score
 from .helper import AverageMeter, timeSince
 
 
@@ -191,10 +190,7 @@ def train_fn(
                     LOGGER.info(
                         f"Epoch_Step {epoch + 1}_{step} - Save Best Score: {best_score:.4f} Model"
                     )
-                    model_path = (
-                        Path(cfg.path)
-                        / f"{NAMES_OF_MODELS[cfg.model_key].replace('/', '-')}_fold{fold}_best.pth"
-                    )
+                    model_path = get_model_path(cfg, fold)
                     torch.save(
                         {"model": model.state_dict(), "predictions": val_predictions},
                         model_path,

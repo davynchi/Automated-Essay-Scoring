@@ -2,6 +2,7 @@ import codecs
 import os
 import random
 from logging import INFO, FileHandler, Formatter, StreamHandler, getLogger
+from pathlib import Path
 from typing import Tuple
 
 import numpy as np
@@ -10,7 +11,7 @@ import torch
 from sklearn.metrics import cohen_kappa_score
 from text_unidecode import unidecode
 
-from .constants import OUTPUT_DIR_TRAIN, SEED
+from .constants import NAMES_OF_MODELS, OUTPUT_DIR_TRAIN, SEED
 
 
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
@@ -84,6 +85,24 @@ def get_score(y_trues, y_preds):
     y_preds = get_essay_score(y_preds)
     score = cohen_kappa_score(y_trues, y_preds, weights="quadratic")
     return score
+
+
+def get_result(target_cols, oof_df):
+    labels = oof_df[target_cols].values
+    preds = oof_df["pred"].values
+    score = get_score(labels, preds)
+    labels = oof_df.loc[oof_df.flag == 1, target_cols].values
+    preds = oof_df.loc[oof_df.flag == 1, "pred"].values
+    score2 = get_score(labels, preds)
+    LOGGER.info(f"Score: {score:<.4f} Score2: {score2:<.4f}")
+
+
+def get_model_path(cfg, fold):
+    model_path = (
+        Path(cfg.path)
+        / f"{NAMES_OF_MODELS[cfg.model_key].replace('/', '-')}_fold{fold}_best.pth"
+    )
+    return model_path
 
 
 def create_paths(cfg):

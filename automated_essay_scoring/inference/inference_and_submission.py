@@ -34,37 +34,7 @@ def inference_fn(test_loader, model, device):
     return predictions
 
 
-def make_submission(cfg):
-    test, submission = load_test_submission_data()
-    test = test[:300]
-    tokenizer = tokenize_text(test)
-    bestWght = calc_best_weights_for_ensemble(cfg)
-    predictions_list = []
-    for cfg_unit in cfg.ensemble.values():
-        test_dataset = LALDataset(cfg_unit, test, tokenizer, is_train=False)
-        test_loader = DataLoader(
-            test_dataset,
-            batch_size=cfg.base.batch_size,
-            shuffle=False,
-            collate_fn=DataCollatorWithPadding(tokenizer=tokenizer, padding="longest"),
-            num_workers=cfg.base.num_workers,
-            pin_memory=True,
-            drop_last=False,
-        )
-        predictions = []
-        for fold in cfg.base.trn_fold:
-            model = create_model(cfg_unit, fold)
-            prediction = inference_fn(test_loader, model, DEVICE)
-            predictions.append(prediction)
-            del model, prediction
-            gc.collect()
-            torch.cuda.empty_cache()
-        predictions = np.mean(predictions, axis=0)
-        predictions_list.append(predictions)
-
-        del predictions, test_dataset, test_loader
-        gc.collect()
-
+def submit_predictions(cfg, test, predictions_list, bestWght, submission):
     test[[f"pred_{j + 1}" for j in range(len(cfg.ensemble))]] = np.array(
         predictions_list
     ).T.reshape(-1, len(cfg.ensemble))
@@ -83,3 +53,36 @@ def make_submission(cfg):
     LOGGER.info(
         f"Predicted scores are saved in the file {SUBMISSION_PATH / SUBMISSION_FILENAME}"
     )
+
+
+def make_submission(cfg):
+    test, submission = load_test_submission_data()
+    tokenizer = tokenize_text(test)
+    bestWght = calc_best_weights_for_ensemble(cfg)
+    predictions_list = []
+    for cfg_unit in cfg.ensemble.values():
+        test_dataset = LALDataset(cfg_unit, test, tokenizer, is_train=False)
+        test_loader = DataLoader(
+            test_dataset,
+            batch_size=cfg.base.batch_size,
+            shuffle=False,
+            collate_fn=DataCollatorWithPadding(tokenizer=tokenizer, padding="longest"),
+            num_workers=cfg.base.num_workers,
+            pin_memory=True,
+            drop_last=False,
+        )
+        predictions = []
+        for fold in range(cfg.n_folds):
+            model = create_model(cfg_unit, fold, load_from_existed=True)
+            prediction = inference_fn(test_loader, model, DEVICE)
+            predictions.append(prediction)
+            del model, prediction
+            gc.collect()
+            torch.cuda.empty_cache()
+        predictions = np.mean(predictions, axis=0)
+        predictions_list.append(predictions)
+
+        del predictions, test_dataset, test_loader
+        gc.collect()
+
+    submit_predictions(cfg, test, predictions_list, bestWght, submission)

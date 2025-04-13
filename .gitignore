@@ -3,6 +3,7 @@ cached_data
 trained_models
 pretrained_models
 submission.csv
+_check.ipynb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

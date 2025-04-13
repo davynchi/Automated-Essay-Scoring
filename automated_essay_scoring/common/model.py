@@ -12,6 +12,7 @@ from .constants import (
     NAMES_OF_MODELS,
     OUTPUT_DIR_FINETUNED,
 )
+from .utils import get_model_path
 
 
 class MeanPooling(nn.Module):
@@ -30,7 +31,14 @@ class MeanPooling(nn.Module):
 
 
 class CustomModel(nn.Module):
-    def __init__(self, cfg, checkpoints_names=None, config_path=None, pretrained=False):
+    def __init__(
+        self,
+        cfg,
+        load_from_existed,
+        checkpoints_names=None,
+        config_path=None,
+        pretrained=False,
+    ):
         super().__init__()
         self.cfg = cfg
         if config_path is None:
@@ -42,7 +50,7 @@ class CustomModel(nn.Module):
 
         self.config.update(cfg.base.model_config)
 
-        if checkpoints_names is None:
+        if checkpoints_names is None or load_from_existed:
             if pretrained:
                 self.model = AutoModel.from_pretrained(
                     NAMES_OF_MODELS[cfg.model_key], config=self.config
@@ -84,8 +92,17 @@ class CustomModel(nn.Module):
 
 
 class CustomModelMeanPooling(CustomModel):
-    def __init__(self, cfg, checkpoints_names=None, config_path=None, pretrained=False):
-        super().__init__(cfg, checkpoints_names, config_path, pretrained)
+    def __init__(
+        self,
+        cfg,
+        load_from_existed,
+        checkpoints_names=None,
+        config_path=None,
+        pretrained=False,
+    ):
+        super().__init__(
+            cfg, load_from_existed, checkpoints_names, config_path, pretrained
+        )
 
         self.pool = MeanPooling()
         self.fc = nn.Linear(self.config.hidden_size, self.cfg.base.target_size)
@@ -93,6 +110,7 @@ class CustomModelMeanPooling(CustomModel):
         self.layer_norm1 = nn.LayerNorm(self.config.hidden_size)
 
     def feature(self, inputs):
+        # print(self.model.device)
         outputs = self.model(**inputs)
         last_hidden_states = outputs[0]
         feature = self.pool(last_hidden_states, inputs["attention_mask"])
@@ -100,8 +118,17 @@ class CustomModelMeanPooling(CustomModel):
 
 
 class CustomModelAttention(CustomModel):
-    def __init__(self, cfg, checkpoints_names=None, config_path=None, pretrained=False):
-        super().__init__(cfg, checkpoints_names, config_path, pretrained)
+    def __init__(
+        self,
+        cfg,
+        load_from_existed,
+        checkpoints_names=None,
+        config_path=None,
+        pretrained=False,
+    ):
+        super().__init__(
+            cfg, load_from_existed, checkpoints_names, config_path, pretrained
+        )
 
         self.fc = nn.Linear(self.config.hidden_size, self.cfg.base.target_size)
         self._init_weights(self.fc)
@@ -122,8 +149,17 @@ class CustomModelAttention(CustomModel):
 
 
 class CustomModelLSTM(CustomModel):
-    def __init__(self, cfg, checkpoints_names, config_path=None, pretrained=False):
-        super().__init__(cfg, checkpoints_names, config_path, pretrained)
+    def __init__(
+        self,
+        cfg,
+        load_from_existed,
+        checkpoints_names=None,
+        config_path=None,
+        pretrained=False,
+    ):
+        super().__init__(
+            cfg, load_from_existed, checkpoints_names, config_path, pretrained
+        )
 
         self.pool = MeanPooling()
         self.fc = nn.Linear(self.config.hidden_size, self.cfg.base.target_size)
@@ -154,24 +190,28 @@ HEAD_CLASS_MAPPING = {
 }
 
 
-def create_model(cfg, fold, checkpoints_names=None):
+def create_model(cfg, fold, load_from_existed, checkpoints_names=None):
     model_class = HEAD_CLASS_MAPPING.get(cfg.head)
     if model_class is None:
         raise ValueError(f"Invalid head type: {cfg.head}")
-    if checkpoints_names is None:
-        config_path = Path(cfg.path) / MODEL_UNIT_CONFIG_NAME
+    config_path = Path(cfg.path) / MODEL_UNIT_CONFIG_NAME
+    if checkpoints_names is None or load_from_existed:
         model = model_class(
-            cfg, checkpoints_names, config_path=config_path, pretrained=False
+            cfg,
+            checkpoints_names=checkpoints_names,
+            load_from_existed=load_from_existed,
+            config_path=config_path,
+            pretrained=False,
         )
         state = torch.load(
-            Path(cfg.path)
-            / f"{NAMES_OF_MODELS[cfg.model_key].replace('/', '-')}_fold{fold}_best.pth",
-            map_location=torch.device("cpu"),
+            get_model_path(cfg, fold),
+            # map_location=torch.device("cpu"),
+            map_location=DEVICE,
             weights_only=False,
         )
         model.load_state_dict(state["model"])
     else:
         model = model_class(cfg, checkpoints_names, config_path=None, pretrained=True)
-        torch.save(model.config, Path(cfg.path) / "config.pth")
-        model.to(DEVICE)
+        torch.save(model.config, config_path)
+    model.to(DEVICE)
     return model

@@ -1,5 +1,4 @@
 import gc
-from pathlib import Path
 from typing import Tuple
 
 import numpy as np
@@ -9,10 +8,9 @@ from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from transformers import get_cosine_schedule_with_warmup, get_linear_schedule_with_warmup
 
-from ..common.constants import NAMES_OF_MODELS
 from ..common.dataset import LALDataset
 from ..common.model import create_model
-from ..common.utils import LOGGER
+from ..common.utils import LOGGER, get_model_path
 from .funcs_for_training_and_validating import train_fn
 
 
@@ -58,7 +56,7 @@ def get_optimizer_params(
     return encoder_params + decoder_params
 
 
-def get_folds(folds, fold: int, cfg) -> Tuple:
+def get_folds(folds, fold: int, will_eval_prompted_set) -> Tuple:
     """
     Splits the dataset into training and two validation folds based on configuration flags.
 
@@ -70,7 +68,7 @@ def get_folds(folds, fold: int, cfg) -> Tuple:
     Returns:
         Tuple of (train_folds, valid_folds, valid_folds2) DataFrames.
     """
-    if cfg.base.flag == 0:
+    if not will_eval_prompted_set:
         train_folds = folds[folds["fold"] != fold].reset_index(drop=True)
         valid_folds = folds[folds["fold"] == fold].reset_index(drop=True)
         valid_folds2 = folds[(folds["fold"] == fold) & (folds["flag"] == 1)].reset_index(
@@ -190,7 +188,7 @@ def get_scheduler(cfg, optimizer, num_train_steps: int):
     return scheduler
 
 
-def train_loop(folds, fold: int, cfg, checkpoints_names, tokenizer):
+def train_loop(folds, fold: int, cfg, checkpoints_names, tokenizer, will_train_again):
     """
     Executes the main training loop for a single fold.
 
@@ -207,14 +205,16 @@ def train_loop(folds, fold: int, cfg, checkpoints_names, tokenizer):
     LOGGER.info(f"========== fold: {fold} training ==========")
 
     # Prepare folds and DataLoaders
-    train_folds, valid_folds, valid_folds2 = get_folds(folds, fold, cfg)
+    train_folds, valid_folds, valid_folds2 = get_folds(
+        folds, fold, will_eval_prompted_set=will_train_again
+    )
     train_loader, valid_loader, valid_loader2 = create_dataloaders(
         train_folds, valid_folds, valid_folds2, cfg, tokenizer
     )
 
-    if checkpoints_names is None:
-        raise ValueError("checkpoints_names must be provided")
-    model = create_model(cfg, fold, checkpoints_names)
+    model = create_model(
+        cfg, fold, checkpoints_names=checkpoints_names, load_from_existed=will_train_again
+    )
     optimizer = create_optimizer(cfg, model)
 
     # Setup scheduler and loss function
@@ -246,12 +246,9 @@ def train_loop(folds, fold: int, cfg, checkpoints_names, tokenizer):
             )
 
     # Load best model predictions
-    model_file = (
-        Path(cfg.path)
-        / f"{NAMES_OF_MODELS[cfg.model_key].replace('/', '-')}_fold{fold}_best.pth"
-    )
+    model_path = get_model_path(cfg, fold)
     predictions = torch.load(
-        model_file, map_location=torch.device("cpu"), weights_only=False
+        model_path, map_location=torch.device("cpu"), weights_only=False
     )["predictions"]
     valid_folds["pred"] = predictions
 
