@@ -25,7 +25,29 @@ def load_model(model_name):
     return model
 
 
-def finetune_and_save_existing_model(cfg):
+def load_datasets():
+    # Load raw text datasets using the datasets library
+    raw_train_dataset = load_dataset("text", data_files={"train": str(TRAIN_TEXT_PATH)})
+    raw_valid_dataset = load_dataset("text", data_files={"train": str(VAL_TEXT_PATH)})
+    return raw_train_dataset, raw_valid_dataset
+
+
+def tokenize_datasets(raw_train_dataset, raw_valid_dataset, tokenizer, block_size):
+    # Tokenize datasets with loop variables bound as default arguments
+    def tokenize_function(examples, tokenizer=tokenizer, block_size=block_size):
+        return tokenizer(examples["text"], truncation=True, max_length=block_size)
+
+    tokenized_train_dataset = raw_train_dataset["train"].map(
+        tokenize_function, batched=True, remove_columns=["text"]
+    )
+    tokenized_valid_dataset = raw_valid_dataset["train"].map(
+        tokenize_function, batched=True, remove_columns=["text"]
+    )
+
+    return tokenized_train_dataset, tokenized_valid_dataset
+
+
+def finetune_model(cfg):
     checkpoints_names = {}
     for model_key, model_name in NAMES_OF_MODELS.items():
         tokenizer = create_tokenizer(path=PATH_TO_TOKENIZER)
@@ -33,21 +55,10 @@ def finetune_and_save_existing_model(cfg):
 
         block_size = cfg.pretrain.line_by_line_text_dataset.block_size
 
-        # Load raw text datasets using the datasets library
-        raw_train_dataset = load_dataset(
-            "text", data_files={"train": str(TRAIN_TEXT_PATH)}
-        )
-        raw_valid_dataset = load_dataset("text", data_files={"train": str(VAL_TEXT_PATH)})
+        raw_train_dataset, raw_valid_dataset = load_datasets()
 
-        # Tokenize datasets with loop variables bound as default arguments
-        def tokenize_function(examples, tokenizer=tokenizer, block_size=block_size):
-            return tokenizer(examples["text"], truncation=True, max_length=block_size)
-
-        tokenized_train_dataset = raw_train_dataset["train"].map(
-            tokenize_function, batched=True, remove_columns=["text"]
-        )
-        tokenized_valid_dataset = raw_valid_dataset["train"].map(
-            tokenize_function, batched=True, remove_columns=["text"]
+        tokenized_train_dataset, tokenized_valid_dataset = tokenize_datasets(
+            raw_train_dataset, raw_valid_dataset, tokenizer, block_size
         )
 
         data_collator = DataCollatorForLanguageModeling(

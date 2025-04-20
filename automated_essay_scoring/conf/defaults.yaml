@@ -5,3 +5,4 @@ defaults:
   - ensemble@ensemble
 
 n_folds: 2 # Было 20, потом поправь
+seed: 42

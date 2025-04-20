@@ -62,8 +62,8 @@ def valid_fn(valid_loader, valid_loader2, model, criterion, cfg):
             all_preds.append(outputs.sigmoid().to("cpu").numpy())
 
             if step % cfg.base.print_freq == 0 or step == (len(valid_loader) - 1):
-                print(
-                    f"EVAL: [{step}/{len(valid_loader)}] "
+                LOGGER.info(
+                    f"EVAL: [{step + 1}/{len(valid_loader)}] "
                     f"Elapsed {timeSince(start_time, (step + 1) / len(valid_loader))} "
                     f"Loss: {losses.val:.4f}({losses.avg:.4f})"
                 )
@@ -160,8 +160,8 @@ def train_fn(
             cfg.base.print_freq * cfg.base.gradient_accumulation_steps
         ) == 0 or step == (len(train_loader) - 1):
             current_lr = scheduler.get_lr()[0]
-            print(
-                f"Epoch: [{epoch + 1}][{step} / {len(train_loader)}] "
+            LOGGER.info(
+                f"Epoch: [{epoch + 1}][{step + 1} / {len(train_loader)}] "
                 f"Elapsed {timeSince(start_time, (step + 1) / len(train_loader))} "
                 f"Loss: {losses.val:.4f}({losses.avg:.4f}) "
                 f"LR: {current_lr:.8f}"

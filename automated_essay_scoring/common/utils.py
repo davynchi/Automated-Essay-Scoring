@@ -11,7 +11,7 @@ import torch
 from sklearn.metrics import cohen_kappa_score
 from text_unidecode import unidecode
 
-from .constants import NAMES_OF_MODELS, OUTPUT_DIR_TRAIN, SEED
+from .constants import NAMES_OF_MODELS, OUTPUT_DIR_TRAIN
 
 
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
@@ -33,7 +33,7 @@ def setup_logger(filename=OUTPUT_DIR_TRAIN / "train.log"):
 LOGGER = setup_logger()
 
 
-def seed_everything(seed=SEED):
+def seed_everything(seed):
     random.seed(seed)
     os.environ["PYTHONHASHSEED"] = str(seed)
     np.random.seed(seed)
@@ -87,14 +87,15 @@ def get_score(y_trues, y_preds):
     return score
 
 
-def get_result(target_cols, oof_df):
+def get_result(target_cols, oof_df, pred_col="pred"):
     labels = oof_df[target_cols].values
-    preds = oof_df["pred"].values
+    preds = oof_df[pred_col].values
     score = get_score(labels, preds)
     labels = oof_df.loc[oof_df.flag == 1, target_cols].values
-    preds = oof_df.loc[oof_df.flag == 1, "pred"].values
+    preds = oof_df.loc[oof_df.flag == 1, pred_col].values
     score2 = get_score(labels, preds)
     LOGGER.info(f"Score: {score:<.4f} Score2: {score2:<.4f}")
+    return score, score2
 
 
 def get_model_path(cfg, fold):

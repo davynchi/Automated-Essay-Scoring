@@ -9,8 +9,8 @@ class LALDataset(Dataset):
         self.texts = df["full_text"].values
         self.is_train = is_train
         if self.is_train:
-            self.labels = df[cfg.base.target_cols2].values
-            self.labels2 = df[cfg.base.target_cols3].values
+            self.labels = df[cfg.base.target_cols].values
+            self.labels2 = df[cfg.base.modif_target_cols].values
 
     def _prepare_input(self, text):
         inputs = self.tokenizer.encode_plus(

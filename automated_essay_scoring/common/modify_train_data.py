@@ -87,7 +87,7 @@ def write_train_and_val(train_text, val_text):
 
 def modify_train_data(cfg):
     train = read_train_dataset()
-    train = train[:72]
+    train = train[:96]
     modify_texts(train["text"])
     train = set_flag_using_prompted_data(train)
     divide_train_into_folds(train, n_splits=cfg.n_folds)

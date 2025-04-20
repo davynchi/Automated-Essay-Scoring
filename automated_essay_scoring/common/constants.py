@@ -4,7 +4,6 @@ import torch
 
 
 # Fundamental defaults
-SEED = 42
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 OUTPUT_DIR_FINETUNED = Path("./pretrained_models")

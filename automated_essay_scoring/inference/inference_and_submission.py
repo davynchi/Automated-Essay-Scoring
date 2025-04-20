@@ -35,11 +35,11 @@ def inference_fn(test_loader, model, device):
 
 
 def submit_predictions(cfg, test, predictions_list, bestWght, submission):
-    test[[f"pred_{j + 1}" for j in range(len(cfg.ensemble))]] = np.array(
+    test[[f"pred_{j}" for j in range(len(cfg.ensemble))]] = np.array(
         predictions_list
     ).T.reshape(-1, len(cfg.ensemble))
     test["pred"] = np.sum(
-        bestWght * test[[f"pred_{j + 1}" for j in range(len(cfg.ensemble))]], axis=1
+        bestWght * test[[f"pred_{j}" for j in range(len(cfg.ensemble))]], axis=1
     )
     test["score"] = get_essay_score(test["pred"].values) + 1
     submission = submission.drop(columns=["score"]).merge(

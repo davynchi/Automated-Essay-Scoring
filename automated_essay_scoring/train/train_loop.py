@@ -1,4 +1,3 @@
-import gc
 from typing import Tuple
 
 import numpy as np
@@ -11,7 +10,7 @@ from transformers import get_cosine_schedule_with_warmup, get_linear_schedule_wi
 from ..common.dataset import LALDataset
 from ..common.model import create_model
 from ..common.utils import LOGGER, get_model_path
-from .funcs_for_training_and_validating import train_fn
+from .train_and_validation_funcs import train_fn
 
 
 def get_optimizer_params(
@@ -223,8 +222,8 @@ def train_loop(folds, fold: int, cfg, checkpoints_names, tokenizer, will_train_a
     criterion = nn.BCEWithLogitsLoss(reduction="mean")
     best_score = -np.inf
 
-    valid_labels = valid_folds[cfg.base.target_cols2].values
-    valid_labels2 = valid_folds2[cfg.base.target_cols2].values
+    valid_labels = valid_folds[cfg.base.target_cols].values
+    valid_labels2 = valid_folds2[cfg.base.target_cols].values
 
     # Run training for each epoch (only training for first 3 epochs as in original logic)
     for epoch in range(cfg.base.epochs):
@@ -251,9 +250,5 @@ def train_loop(folds, fold: int, cfg, checkpoints_names, tokenizer, will_train_a
         model_path, map_location=torch.device("cpu"), weights_only=False
     )["predictions"]
     valid_folds["pred"] = predictions
-
-    # Cleanup GPU memory
-    torch.cuda.empty_cache()
-    gc.collect()
 
     return valid_folds

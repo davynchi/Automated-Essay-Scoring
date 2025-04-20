@@ -1,9 +1,8 @@
-import gc
-
+import mlflow
 import numpy as np
 from scipy.optimize import minimize
 
-from ..common.utils import LOGGER, get_score
+from ..common.utils import LOGGER, get_result, get_score
 from .oof import get_oof_preds
 
 
@@ -25,7 +24,7 @@ def calc_best_weights_for_ensemble(cfg):
 
     num_models_in_ensemble = len(cfg.ensemble)
     for i in range(num_models_in_ensemble):
-        predictions.append(df_oof[f"pred_{i + 1}"].values)
+        predictions.append(df_oof[f"pred_{i}"].values)
 
     for fold in range(cfg.n_folds):
         starting_values = [1 / num_models_in_ensemble] * num_models_in_ensemble
@@ -47,18 +46,19 @@ def calc_best_weights_for_ensemble(cfg):
     bestWght = np.mean(wghts, axis=0)
     bestWght = bestWght / bestWght.sum()
     LOGGER.info("\n Ensemble Score: {best_score:.7f}".format(best_score=-bestSC))
+    mlflow.log_metric("ensemble_score", -bestSC)
     LOGGER.info("\n Best Weights: {weights:}".format(weights=bestWght))
+    mlflow.log_param("best_weights", bestWght)
 
     df_oof["blending"] = np.sum(
-        bestWght * df_oof[[f"pred_{j + 1}" for j in range(num_models_in_ensemble)]],
+        bestWght * df_oof[[f"pred_{j}" for j in range(num_models_in_ensemble)]],
         axis=1,
     )
-    LOGGER.info(f"Blending score: {get_score(y_values, df_oof['blending'].values)}")
-    LOGGER.info(
-        f"Score on non prompted data: {get_score(df_oof.loc[df_oof.flag == 1, 'score'].values, df_oof.loc[df_oof.flag == 1, 'blending'].values)}"
-    )
 
-    del predictions, lls, wghts, starting_values, res, bestSC
-    gc.collect()
+    blending_score_all_texts, blending_score_unprompted_texts = get_result(
+        cfg.base.target_cols, df_oof, "blending"
+    )
+    mlflow.log_metric("blending_score_all_texts", blending_score_all_texts)
+    mlflow.log_metric("blending_score_unprompted_texts", blending_score_unprompted_texts)
 
     return bestWght
