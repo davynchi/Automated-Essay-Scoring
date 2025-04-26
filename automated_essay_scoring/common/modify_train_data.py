@@ -6,8 +6,6 @@ from .constants import (
     DATA_PATH,
     PATH_TO_TOKENIZER,
     PROMPTED_DATA_FILENAME,
-    SAMPLE_SUBMISSION_FILENAME,
-    TEST_FILENAME,
     TRAIN_FILENAME,
     TRAIN_PICKLE_PATH,
     TRAIN_TEXT_PATH,
@@ -20,13 +18,6 @@ def read_train_dataset():
     train = pd.read_csv(DATA_PATH / TRAIN_FILENAME)
     train.columns = ["id", "text", "score"]
     return train
-
-
-def load_test_submission_data():
-    test = pd.read_csv(DATA_PATH / TEST_FILENAME)
-    submission = pd.read_csv(DATA_PATH / SAMPLE_SUBMISSION_FILENAME)
-    modify_texts(test["full_text"])
-    return test, submission
 
 
 def divide_train_into_folds(train, n_splits):

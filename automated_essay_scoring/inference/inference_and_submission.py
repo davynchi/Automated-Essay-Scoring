@@ -1,15 +1,22 @@
 import gc
 
 import numpy as np
+import pandas as pd
 import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import DataCollatorWithPadding
 
-from ..common.constants import DEVICE, SUBMISSION_FILENAME, SUBMISSION_PATH
+from ..common.constants import (
+    DATA_PATH,
+    DEVICE,
+    SUBMISSION_FILENAME,
+    SUBMISSION_PATH,
+    TEST_FILENAME,
+)
 from ..common.dataset import LALDataset, collate
 from ..common.model import create_model
-from ..common.modify_train_data import load_test_submission_data, tokenize_text
+from ..common.modify_train_data import modify_texts, tokenize_text
 from ..common.utils import LOGGER, get_essay_score
 from .nelder_mead import calc_best_weights_for_ensemble
 
@@ -34,6 +41,12 @@ def inference_fn(test_loader, model, device):
     return predictions
 
 
+def load_test_data():
+    test = pd.read_csv(DATA_PATH / TEST_FILENAME)
+    modify_texts(test["full_text"])
+    return test
+
+
 def submit_predictions(cfg, test, predictions_list, bestWght, submission):
     test[[f"pred_{j}" for j in range(len(cfg.ensemble))]] = np.array(
         predictions_list
@@ -42,21 +55,16 @@ def submit_predictions(cfg, test, predictions_list, bestWght, submission):
         bestWght * test[[f"pred_{j}" for j in range(len(cfg.ensemble))]], axis=1
     )
     test["score"] = get_essay_score(test["pred"].values) + 1
-    submission = submission.drop(columns=["score"]).merge(
-        test[["essay_id", "score"]], on="essay_id", how="left"
-    )
-
+    submission = test[["essay_id", "score"]]
     SUBMISSION_PATH.mkdir(parents=True, exist_ok=True)
-    submission[["essay_id", "score"]].to_csv(
-        SUBMISSION_PATH / SUBMISSION_FILENAME, index=False
-    )
+    submission.to_csv(SUBMISSION_PATH / SUBMISSION_FILENAME, index=False)
     LOGGER.info(
         f"Predicted scores are saved in the file {SUBMISSION_PATH / SUBMISSION_FILENAME}"
     )
 
 
 def make_submission(cfg):
-    test, submission = load_test_submission_data()
+    test = load_test_data()
     tokenizer = tokenize_text(test)
     bestWght = calc_best_weights_for_ensemble(cfg)
     predictions_list = []
@@ -85,4 +93,4 @@ def make_submission(cfg):
         del predictions, test_dataset, test_loader
         gc.collect()
 
-    submit_predictions(cfg, test, predictions_list, bestWght, submission)
+    submit_predictions(cfg, test, predictions_list, bestWght)
