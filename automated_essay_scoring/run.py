@@ -6,11 +6,11 @@ from hydra import compose, initialize
 from omegaconf import OmegaConf
 
 from .common.constants import SUBMISSION_FILENAME, SUBMISSION_PATH
+from .common.finetune_model import finetune_model
+from .common.inference_lightning import make_submission_lightning
 from .common.modify_train_data import modify_train_data
+from .common.train_lightning import train_model_lightning
 from .common.utils import create_paths, register_new_utf_errors, seed_everything
-from .deberta_tuning import finetune_model
-from .inference import make_submission
-from .train import train_model
 
 
 def train_and_submit_model():
@@ -32,17 +32,21 @@ def train_and_submit_model():
 
         mlflow.set_tag("seed", cfg.seed)
 
+        # ───────────────── data ────────────────── #
         mlflow.set_tag("stage", "data_preprocessing")
         modify_train_data(cfg)
 
-        mlflow.set_tag("stage", "finetune")
+        # ───────────────── LM fine-tune ─────────── #
+        mlflow.set_tag("stage", "finetune_MLM")
         checkpoints_names, tokenizer = finetune_model(cfg)
 
+        # ───────────────── main training ────────── #
         mlflow.set_tag("stage", "main_training")
-        train_model(cfg, checkpoints_names, tokenizer)
+        train_model_lightning(cfg, checkpoints_names, tokenizer)
 
+        # ───────────────── inference / submit ───── #
         mlflow.set_tag("stage", "inference")
-        make_submission(cfg)
+        make_submission_lightning(cfg, tokenizer)
 
         mlflow.log_artifact(str(SUBMISSION_PATH / SUBMISSION_FILENAME))
 

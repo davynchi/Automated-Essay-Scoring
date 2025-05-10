@@ -41,6 +41,11 @@ class CustomModel(nn.Module):
     ):
         super().__init__()
         self.cfg = cfg
+
+        # ── 1) if the file does NOT exist yet, treat it as "None" ───────── #
+        if config_path is not None and not Path(config_path).is_file():
+            config_path = None
+
         if config_path is None:
             self.config = AutoConfig.from_pretrained(
                 NAMES_OF_MODELS[cfg.model_key], output_hidden_states=True
@@ -63,6 +68,12 @@ class CustomModel(nn.Module):
                 / (NAMES_OF_MODELS[cfg.model_key].replace("/", "-") + CHECKPOINT_POSTFIX)
                 / checkpoints_names[cfg.model_key]
             )
+
+        # ── 2)  save config the first time we ever create it  ───────────── #
+        if config_path is None:
+            save_path = Path(cfg.path) / MODEL_UNIT_CONFIG_NAME
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+            torch.save(self.config, save_path)
 
         self.model.gradient_checkpointing_enable()
 

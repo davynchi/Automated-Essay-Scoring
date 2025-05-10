@@ -17,6 +17,10 @@ from .constants import NAMES_OF_MODELS, OUTPUT_DIR_TRAIN
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
 
+def allow_flash_attention():
+    torch.backends.cuda.enable_flash_sdp(True)
+
+
 def setup_logger(filename=OUTPUT_DIR_TRAIN / "train.log"):
     OUTPUT_DIR_TRAIN.mkdir(parents=True, exist_ok=True)
     logger = getLogger(__name__)
@@ -36,6 +40,10 @@ LOGGER = setup_logger()
 def seed_everything(seed):
     random.seed(seed)
     os.environ["PYTHONHASHSEED"] = str(seed)
+    os.environ[
+        "PYTORCH_CUDA_ALLOC_CONF"
+    ] = "expandable_segments:True,max_split_size_mb:128"
+    torch.backends.cuda.enable_flash_sdp(True)
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)

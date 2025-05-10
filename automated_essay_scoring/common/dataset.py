@@ -7,6 +7,7 @@ class LALDataset(Dataset):
         self.tokenizer = tokenizer
         self.cfg = cfg
         self.texts = df["full_text"].values
+        self.df = df
         self.is_train = is_train
         if self.is_train:
             self.labels = df[cfg.base.target_cols].values

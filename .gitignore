@@ -5,6 +5,7 @@ pretrained_models
 submission.csv
 _check.ipynb
 mlruns
+_train
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

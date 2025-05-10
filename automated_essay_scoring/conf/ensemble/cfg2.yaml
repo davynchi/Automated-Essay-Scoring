@@ -2,7 +2,7 @@
 defaults:
   - base@base
 
-max_len: 1024
+max_len: 768 # 1024
 head: "attention"
 model_key: "base"
 freeze_layer: 9

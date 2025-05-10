@@ -1,3 +1,6 @@
+from glob import glob
+from pathlib import Path
+
 import pandas as pd
 from iterstrat.ml_stratifiers import MultilabelStratifiedKFold
 from transformers import DebertaTokenizer
@@ -12,6 +15,62 @@ from .constants import (
     VAL_TEXT_PATH,
 )
 from .utils import modify_texts
+
+
+# def load_pickle_data(cfg, load_from_existed_pickle):
+#     train = pd.read_pickle(TRAIN_PICKLE_PATH)
+#     if load_from_existed_pickle:
+#         oof = pd.read_pickle(Path(cfg.path) / PICKLE_NAME)
+#         train = train.merge(oof[["essay_id", "pred"]], on="essay_id", how="left")
+#         train[cfg.base.modif_target_cols[0]] = (
+#             (train[cfg.base.target_cols[0]].values / 5) * (1 - cfg.base.sl_rate)
+#         ) + (train["pred"].values * cfg.base.sl_rate)
+#     else:
+#         train[cfg.base.modif_target_cols[0]] = train[cfg.base.target_cols[0]].values / 5
+
+#     return train
+
+
+def load_pickle_data(cfg_unit, load_from_existed_pickle: bool) -> pd.DataFrame:
+    """
+    Return the training dataframe, optionally blended with stage-1 OOF predictions.
+
+    Parameters
+    ----------
+    cfg_unit : DictConfig for the current ensemble member
+    load_from_existed_pickle : bool
+        False → stage-1, no OOF yet
+        True  → stage-2, blend with OOF from each fold if they exist
+    """
+    train = pd.read_pickle(TRAIN_PICKLE_PATH)
+
+    if load_from_existed_pickle:
+        # ── gather all oof_fold*.pkl written in stage-1 ───────────────────── #
+        oof_paths = sorted(glob(str(Path(cfg_unit.path) / "oof_fold*.pkl")))
+        if not oof_paths:  # safety: if stage-1 never wrote the files yet
+            print(
+                f"[WARN] No OOF files found in {cfg_unit.path}; "
+                "continuing without self-learning blend."
+            )
+            train[cfg_unit.base.modif_target_cols[0]] = (
+                train[cfg_unit.base.target_cols[0]].values / 5
+            )
+            return train
+
+        oof_list = [pd.read_pickle(p) for p in oof_paths]
+        oof = pd.concat(oof_list, ignore_index=True)
+
+        # ── merge preds & blend target -------------------------------------- #
+        train = train.merge(oof[["essay_id", "pred"]], on="essay_id", how="left")
+        train[cfg_unit.base.modif_target_cols[0]] = (
+            (train[cfg_unit.base.target_cols[0]].values / 5) * (1 - cfg_unit.base.sl_rate)
+        ) + (train["pred"].fillna(0).values * cfg_unit.base.sl_rate)
+    else:
+        train[cfg_unit.base.modif_target_cols[0]] = (
+            train[cfg_unit.base.target_cols[0]].values / 5
+        )
+
+    return train
 
 
 def read_train_dataset():
@@ -78,7 +137,7 @@ def write_train_and_val(train_text, val_text):
 
 def modify_train_data(cfg):
     train = read_train_dataset()
-    train = train[:96]
+    train = train[:72]
     modify_texts(train["text"])
     train = set_flag_using_prompted_data(train)
     divide_train_into_folds(train, n_splits=cfg.n_folds)

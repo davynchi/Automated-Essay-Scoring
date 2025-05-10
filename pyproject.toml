@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "mlops-project"
-version = "0.1.0"
+version = "0.2.0"
 description = "A project for my the course \"MLOps\" which is being taught at my master's degree. It is based on kaggle notebook of rating student's and schoolboy's essays."
 authors = ["davynci <davydov.mv@phystech.edu>"]
 readme = "README.md"
@@ -26,6 +26,7 @@ omegaconf = "^2.3.0"
 datasets = "^3.5.0"
 iterative-stratification = "^0.1.9"
 mlflow = "^2.21.3"
+lightning = "^2.5.1.post0"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^4.0.0"

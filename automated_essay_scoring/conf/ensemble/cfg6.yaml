@@ -2,7 +2,7 @@
 defaults:
   - base@base
 
-max_len: 1536
+max_len: 1024 # 1536
 head: "lstm"
 model_key: "base"
 freeze_layer: 9
