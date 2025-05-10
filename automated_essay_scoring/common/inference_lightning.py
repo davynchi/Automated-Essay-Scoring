@@ -1,5 +1,6 @@
 # inference_lightning.py
 import gc
+import logging
 from pathlib import Path
 
 import numpy as np
@@ -14,7 +15,10 @@ from .constants import DATA_PATH, SUBMISSION_FILENAME, SUBMISSION_PATH, TEST_FIL
 from .dataset import LALDataset, collate
 from .lightning_modules import EssayScoringPL
 from .modify_train_data import modify_texts
-from .utils import LOGGER, get_essay_score
+from .utils import get_essay_score
+
+
+log = logging.getLogger(__name__)
 
 
 # ───────────────── helpers ───────────────────────────────────────────── #
@@ -94,4 +98,4 @@ def make_submission_lightning(cfg, tokenizer):
     test_df[["essay_id", "score"]].to_csv(
         SUBMISSION_PATH / SUBMISSION_FILENAME, index=False
     )
-    LOGGER.info(f"Saved {SUBMISSION_PATH / SUBMISSION_FILENAME}")
+    log.info(f"Saved {SUBMISSION_PATH / SUBMISSION_FILENAME}")

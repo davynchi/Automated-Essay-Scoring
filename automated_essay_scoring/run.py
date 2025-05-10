@@ -1,19 +1,27 @@
+import logging
+
 import fire
 import mlflow
 import mlflow.pytorch
 import mlflow.transformers
 from hydra import compose, initialize
+from lightning.pytorch import seed_everything
 from omegaconf import OmegaConf
 
 from .common.constants import SUBMISSION_FILENAME, SUBMISSION_PATH
 from .common.finetune_model import finetune_model
 from .common.inference_lightning import make_submission_lightning
+from .common.logging_config import configure_logging
 from .common.modify_train_data import modify_train_data
 from .common.train_lightning import train_model_lightning
-from .common.utils import create_paths, register_new_utf_errors, seed_everything
+from .common.utils import create_paths, register_new_utf_errors, set_torch_params
 
 
 def train_and_submit_model():
+    configure_logging(level="INFO")
+    log = logging.getLogger(__name__)
+    log.info("🚀 Starting pipeline …")
+
     mlflow.set_experiment("essay-scoring-pipeline")
     mlflow.autolog()
     mlflow.pytorch.autolog()
@@ -27,7 +35,8 @@ def train_and_submit_model():
         mlflow.log_dict(OmegaConf.to_container(cfg, resolve=True), "config.json")
         # print(f"Final Configurations: \n{OmegaConf.to_yaml(cfg)}")
 
-        seed_everything(cfg.seed)
+        seed_everything(cfg.seed, workers=True)
+        set_torch_params()
         register_new_utf_errors()
 
         mlflow.set_tag("seed", cfg.seed)

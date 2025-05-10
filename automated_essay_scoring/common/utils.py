@@ -1,7 +1,8 @@
 import codecs
+
+# from logging import INFO, FileHandler, Formatter, StreamHandler, getLogger
+import logging
 import os
-import random
-from logging import INFO, FileHandler, Formatter, StreamHandler, getLogger
 from pathlib import Path
 from typing import Tuple
 
@@ -14,40 +15,13 @@ from text_unidecode import unidecode
 from .constants import NAMES_OF_MODELS, OUTPUT_DIR_TRAIN
 
 
-os.environ["TOKENIZERS_PARALLELISM"] = "true"
-
-
-def allow_flash_attention():
-    torch.backends.cuda.enable_flash_sdp(True)
-
-
-def setup_logger(filename=OUTPUT_DIR_TRAIN / "train.log"):
-    OUTPUT_DIR_TRAIN.mkdir(parents=True, exist_ok=True)
-    logger = getLogger(__name__)
-    logger.setLevel(INFO)
-    handler1 = StreamHandler()
-    handler1.setFormatter(Formatter("%(message)s"))
-    handler2 = FileHandler(filename=filename)
-    handler2.setFormatter(Formatter("%(message)s"))
-    logger.addHandler(handler1)
-    logger.addHandler(handler2)
-    return logger
-
-
-LOGGER = setup_logger()
-
-
-def seed_everything(seed):
-    random.seed(seed)
-    os.environ["PYTHONHASHSEED"] = str(seed)
+def set_torch_params():
     os.environ[
         "PYTORCH_CUDA_ALLOC_CONF"
     ] = "expandable_segments:True,max_split_size_mb:128"
     torch.backends.cuda.enable_flash_sdp(True)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
+    os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
 
 def replace_encoding_with_utf8(error: UnicodeError) -> Tuple[bytes, int]:
@@ -102,7 +76,8 @@ def get_result(target_cols, oof_df, pred_col="pred"):
     labels = oof_df.loc[oof_df.flag == 1, target_cols].values
     preds = oof_df.loc[oof_df.flag == 1, pred_col].values
     score2 = get_score(labels, preds)
-    LOGGER.info(f"Score: {score:<.4f} Score2: {score2:<.4f}")
+    log = logging.getLogger(__name__)
+    log.info(f"Score: {score:<.4f} Score2: {score2:<.4f}")
     return score, score2
 
 

@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 import mlflow
@@ -5,7 +6,10 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 
-from .utils import LOGGER, get_result, get_score
+from .utils import get_result, get_score
+
+
+log = logging.getLogger(__name__)
 
 
 def load_all_folds(model_dir: Path) -> pd.DataFrame:
@@ -23,7 +27,7 @@ def get_oof_preds(cfg):
     for i, cfg_unit in enumerate(cfg.ensemble.values()):
         oof_df = load_all_folds(Path(cfg_unit.path))
 
-        LOGGER.info(f"pred_{i} {cfg_unit.path}")
+        log.info(f"pred_{i} {cfg_unit.path}")
         score_all_texts, score_unprompted_texts = get_result(
             cfg_unit.base.target_cols, oof_df
         )
@@ -83,9 +87,9 @@ def calc_best_weights_for_ensemble(cfg):
     bestSC = np.mean(lls)
     bestWght = np.mean(wghts, axis=0)
     bestWght = bestWght / bestWght.sum()
-    LOGGER.info("\n Ensemble Score: {best_score:.7f}".format(best_score=-bestSC))
+    log.info("\n Ensemble Score: {best_score:.7f}".format(best_score=-bestSC))
     mlflow.log_metric("ensemble_score", -bestSC)
-    LOGGER.info("\n Best Weights: {weights:}".format(weights=bestWght))
+    log.info("\n Best Weights: {weights:}".format(weights=bestWght))
     mlflow.log_param("best_weights", bestWght)
 
     df_oof["blending"] = np.sum(
@@ -99,24 +103,23 @@ def calc_best_weights_for_ensemble(cfg):
     mlflow.log_metric("blending_score_all_texts", blending_score_all_texts)
     mlflow.log_metric("blending_score_unprompted_texts", blending_score_unprompted_texts)
 
-    if False:
-        # 1. Диапазон и уникальность прогнозов
-        print(df_oof[[f"pred_{i}" for i in range(4)]].describe())
-        print(df_oof[[f"pred_{i}" for i in range(4)]].corr())
+    # # 1. Диапазон и уникальность прогнозов
+    # print(df_oof[[f"pred_{i}" for i in range(4)]].describe())
+    # print(df_oof[[f"pred_{i}" for i in range(4)]].corr())
 
-        # 2. Попробовать другой старт
-        for _ in range(3):
-            start = np.random.dirichlet(np.ones(len(cfg.ensemble)))
-            res = minimize(
-                loss_func,
-                start,
-                args=(
-                    df_oof.loc[df_oof.fold == fold].index,
-                    predictions,
-                ),
-                method="Nelder-Mead",
-                tol=1e-6,
-            )
-            print(res.x, -res.fun)
+    # # 2. Попробовать другой старт
+    # for _ in range(3):
+    #     start = np.random.dirichlet(np.ones(len(cfg.ensemble)))
+    #     res = minimize(
+    #         loss_func,
+    #         start,
+    #         args=(
+    #             df_oof.loc[df_oof.fold == fold].index,
+    #             predictions,
+    #         ),
+    #         method="Nelder-Mead",
+    #         tol=1e-6,
+    #     )
+    #     print(res.x, -res.fun)
 
     return bestWght
