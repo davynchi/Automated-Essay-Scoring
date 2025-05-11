@@ -15,7 +15,11 @@ from text_unidecode import unidecode
 from .constants import NAMES_OF_MODELS, OUTPUT_DIR_TRAIN
 
 
-def set_torch_params():
+def set_torch_params() -> None:
+    """
+    Устанавливает CUDA‑переменные окружения и включает
+    Flash‑Attention / Deterministic режимы по конфигурации.
+    """
     os.environ[
         "PYTORCH_CUDA_ALLOC_CONF"
     ] = "expandable_segments:True,max_split_size_mb:128"
@@ -32,14 +36,15 @@ def replace_decoding_with_cp1252(error: UnicodeError) -> Tuple[str, int]:
     return error.object[error.start : error.end].decode("cp1252"), error.end
 
 
-def register_new_utf_errors():
+def register_new_utf_errors() -> None:
+    """Регистрация пользовательских обработчиков ошибок кодировок."""
     # Register the encoding and decoding error handlers for `utf-8` and `cp1252`.
     codecs.register_error("replace_encoding_with_utf8", replace_encoding_with_utf8)
     codecs.register_error("replace_decoding_with_cp1252", replace_decoding_with_cp1252)
 
 
 def resolve_encodings_and_normalize(text: str) -> str:
-    """Resolve the encoding problems and normalize the abnormal characters."""
+    """Фикс «кракозябр» и юникод‑нормализация с помощью *text_unidecode*."""
     text = (
         text.encode("raw_unicode_escape")
         .decode("utf-8", errors="replace_decoding_with_cp1252")
@@ -50,12 +55,17 @@ def resolve_encodings_and_normalize(text: str) -> str:
     return text
 
 
-def modify_texts(texts):
+def modify_texts(texts: pd.Series) -> None:
+    """In‑place нормализация списка текстов (вызывает ``resolve_encodings...``)."""
     texts = texts.apply(lambda x: resolve_encodings_and_normalize(x))
     texts = [text.replace("\n", "[BR]") for text in texts]
 
 
-def get_essay_score(y_preds):
+def get_essay_score(y_preds: np.ndarray) -> pd.Series:
+    """
+    Преобразует непрерывный скор (0–1) → дискретный диапазон [0..5]
+    через разбиение на интервалы (как в соревновании Kaggle).
+    """
     return pd.cut(
         y_preds.reshape(-1) * 5,
         [-np.inf, 0.83333333, 1.66666667, 2.5, 3.33333333, 4.16666667, np.inf],
@@ -63,13 +73,23 @@ def get_essay_score(y_preds):
     ).astype(int)
 
 
-def get_score(y_trues, y_preds):
+def get_score(y_trues: np.ndarray, y_preds: np.ndarray) -> float:
+    """
+    Вычисляет Quadratic Weighted Kappa (QWK) между истинными
+    метками и прогнозами.
+    """
     y_preds = get_essay_score(y_preds)
     score = cohen_kappa_score(y_trues, y_preds, weights="quadratic")
     return score
 
 
-def get_result(target_cols, oof_df, pred_col="pred"):
+def get_result(
+    target_cols, oof_df: pd.DataFrame, pred_col: str = "pred"
+) -> tuple[float, float]:
+    """
+    Печатает и возвращает QWK по **всем** текстам и
+    отдельно по un‑prompted (flag 1).
+    """
     labels = oof_df[target_cols].values
     preds = oof_df[pred_col].values
     score = get_score(labels, preds)
@@ -89,7 +109,11 @@ def get_model_path(cfg, fold):
     return model_path
 
 
-def create_paths(cfg):
+def create_paths(cfg) -> None:
+    """
+    Создаёт каталоги ``trained_models/model_{i}`` и
+    прописывает путь в каждом элементе ``cfg.ensemble``.
+    """
     for i, model_cfg in enumerate(cfg.ensemble.values()):
         model_path = OUTPUT_DIR_TRAIN / f"model_{i}"
         model_path.mkdir(parents=True, exist_ok=True)

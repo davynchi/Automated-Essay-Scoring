@@ -1,23 +1,26 @@
-from typing import Tuple
-
 import pandas as pd
 import pytorch_lightning as pl
 import torch
 from torch.utils.data import DataLoader
 from torch.utils.data._utils.collate import default_collate
 
+from .constants import PATH_TO_TOKENIZER
 from .dataset import LALDataset
 from .dataset import collate as clip_to_max_len
+from .modify_train_data import create_tokenizer
 
 
 def lightning_collate(batch):
+    """Collate‑функция для PL DataLoader: паддинг + конвертация меток."""
     inputs, y, y2 = zip(*batch, strict=True)  # un-zip list of tuples
     inputs = default_collate(inputs)
     inputs = clip_to_max_len(inputs)
     return inputs, torch.stack(y), torch.stack(y2)
 
 
-def get_folds(folds, fold: int, will_eval_prompted_set) -> Tuple:
+def get_folds(
+    folds: pd.DataFrame, fold: int, will_eval_prompted_set: bool
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     Splits the dataset into training and two validation folds based on configuration flags.
 
@@ -51,12 +54,15 @@ def get_folds(folds, fold: int, will_eval_prompted_set) -> Tuple:
 
 
 class EssayDataModule(pl.LightningDataModule):
-    def __init__(
-        self, cfg, tokenizer, df: pd.DataFrame, fold: int, eval_on_prompted: bool
-    ):
+    """
+    LightningDataModule, инкапсулирующий логику split‑ов и DataLoader‑ов
+    для каждого фолда и стадии.
+    """
+
+    def __init__(self, cfg, df: pd.DataFrame, fold: int, eval_on_prompted: bool):
         super().__init__()
         self.cfg = cfg
-        self.tokenizer = tokenizer
+        self.tokenizer = create_tokenizer(path=PATH_TO_TOKENIZER)
         self.df = df
         self.fold = fold
         self.eval_on_prompted = eval_on_prompted

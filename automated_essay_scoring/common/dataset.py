@@ -3,11 +3,17 @@ from torch.utils.data import Dataset
 
 
 class LALDataset(Dataset):
+    """
+    Кастомный Dataset для эссе.
+    В режиме *train* возвращает кортеж (*inputs*, *score*, *score_s*),
+    в режиме *inference* — только *inputs*.
+    """
+
     def __init__(self, cfg, df, tokenizer, is_train):
         self.tokenizer = tokenizer
         self.cfg = cfg
-        self.texts = df["full_text"].values
         self.df = df
+        self.texts = df["full_text"].values
         self.is_train = is_train
         if self.is_train:
             self.labels = df[cfg.base.target_cols].values
@@ -39,7 +45,11 @@ class LALDataset(Dataset):
             return inputs
 
 
-def collate(inputs):
+def collate(inputs: dict[str, "torch.Tensor"]) -> dict[str, "torch.Tensor"]:
+    """
+    Обрезает батч до максимальной фактической длины последовательности,
+    чтобы не тратить VRAM на паддинг.
+    """
     mask_len = int(inputs["attention_mask"].sum(axis=1).max())
     for k, _ in inputs.items():
         inputs[k] = inputs[k][:, :mask_len]

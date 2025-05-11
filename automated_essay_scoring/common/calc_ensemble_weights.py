@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 
+from .constants import BEST_ENSEMBLE_WEIGHTS_FILENAME, BEST_ENSEMBLE_WEIGHTS_PATH
 from .utils import get_result, get_score
 
 
@@ -13,9 +14,7 @@ log = logging.getLogger(__name__)
 
 
 def load_all_folds(model_dir: Path) -> pd.DataFrame:
-    """
-    Concatenate every `oof_fold*.pkl` saved for this model directory.
-    """
+    """Склейка всех файлов ``oof_fold*.pkl`` в один DataFrame."""
     pkls = sorted(model_dir.glob("oof_fold*.pkl"))
     if not pkls:
         raise FileNotFoundError(f"No OOF pickle found in {model_dir}")
@@ -23,7 +22,12 @@ def load_all_folds(model_dir: Path) -> pd.DataFrame:
     return pd.concat(dfs, ignore_index=True)
 
 
-def get_oof_preds(cfg):
+def get_oof_preds(cfg) -> pd.DataFrame:
+    """
+    Формирует общую таблицу OOF‑предсказаний для всех участников ансамбля
+    (по id‑эссе), логируя индивидуальные метрики в MLflow.
+    """
+
     for i, cfg_unit in enumerate(cfg.ensemble.values()):
         oof_df = load_all_folds(Path(cfg_unit.path))
 
@@ -49,6 +53,18 @@ def get_oof_preds(cfg):
 
 
 def calc_best_weights_for_ensemble(cfg):
+    """
+    Подбирает веса ансамбля с помощью Nelder–Mead так,
+    чтобы максимизировать QWK на каждом фолде, затем усредняет веса.
+
+    * Сохраняет ``best_ensemble_weights.npy``.
+    * Логирует финальные метрики и найденные веса в MLflow.
+
+    Возврат
+    -------
+    np.ndarray
+        Итоговый нормированный вектор весов (shape = [n_models]).
+    """
     df_oof = get_oof_preds(cfg)
     y_values = df_oof[cfg.base.target_cols].values
 
@@ -84,16 +100,17 @@ def calc_best_weights_for_ensemble(cfg):
         lls.append(res["fun"])
         wghts.append(res["x"])
 
-    bestSC = np.mean(lls)
-    bestWght = np.mean(wghts, axis=0)
-    bestWght = bestWght / bestWght.sum()
-    log.info("\n Ensemble Score: {best_score:.7f}".format(best_score=-bestSC))
-    mlflow.log_metric("ensemble_score", -bestSC)
-    log.info("\n Best Weights: {weights:}".format(weights=bestWght))
-    mlflow.log_param("best_weights", bestWght)
+    best_ens_score = np.mean(lls)
+    log.info("\n Ensemble Score: {best_score:.7f}".format(best_score=-best_ens_score))
+    mlflow.log_metric("ensemble_score", -best_ens_score)
+
+    best_weights = np.mean(wghts, axis=0)
+    best_weights = best_weights / best_weights.sum()
+    log.info("\n Best Weights: {weights:}".format(weights=best_weights))
+    mlflow.log_param("best_weights", best_weights)
 
     df_oof["blending"] = np.sum(
-        bestWght * df_oof[[f"pred_{j}" for j in range(num_models_in_ensemble)]],
+        best_weights * df_oof[[f"pred_{j}" for j in range(num_models_in_ensemble)]],
         axis=1,
     )
 
@@ -122,4 +139,6 @@ def calc_best_weights_for_ensemble(cfg):
     #     )
     #     print(res.x, -res.fun)
 
-    return bestWght
+    BEST_ENSEMBLE_WEIGHTS_PATH.mkdir(parents=True, exist_ok=True)
+    np.save(BEST_ENSEMBLE_WEIGHTS_PATH / BEST_ENSEMBLE_WEIGHTS_FILENAME, best_weights)
+    return best_weights

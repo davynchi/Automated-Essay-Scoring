@@ -12,7 +12,9 @@ from .utils import get_score
 
 
 class EssayScoringPL(L.LightningModule):
-    def __init__(self, cfg, model_key, checkpoints_names=None, load_from_existed=False):
+    def __init__(
+        self, cfg, model_key, path_to_finetuned_models=None, load_from_existed=False
+    ):
         super().__init__()
         self.cfg = cfg
         self.model_key = model_key
@@ -22,7 +24,7 @@ class EssayScoringPL(L.LightningModule):
         self.core = model_cls(
             cfg,
             load_from_existed=load_from_existed,
-            checkpoints_names=checkpoints_names,
+            path_to_finetuned_models=path_to_finetuned_models,
             config_path=Path(cfg.path) / "config.pth",
             pretrained=not load_from_existed,
         )

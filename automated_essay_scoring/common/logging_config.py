@@ -9,6 +9,12 @@ LOG_DIR.mkdir(exist_ok=True)
 
 
 def configure_logging(level: str = "INFO", filename: str = "train.log") -> None:
+    """
+    Настраивает корневой логгер:
+      * Консоль + вращающийся file‑handler.
+      * Подавляет подробный вывод Lightning/Transformers/MLflow.
+      * Перенаправляет предупреждения о «local version label» на ERROR.
+    """
     fmt = "%(asctime)s  %(levelname)-8s  %(name)s: %(message)s"
     datefmt = "%H:%M:%S"
 

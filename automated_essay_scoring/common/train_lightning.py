@@ -2,6 +2,7 @@
 import gc
 from pathlib import Path
 
+import pandas as pd
 import pytorch_lightning as L
 import torch
 from pytorch_lightning.callbacks import ModelCheckpoint
@@ -17,7 +18,10 @@ from .modify_train_data import load_pickle_data, tokenize_text
 
 # ---------------------------------------------------------------------------- #
 def build_pred_dl(dataset, cfg) -> DataLoader:
-    """Return a DataLoader that yields *inputs-only* batches for prediction."""
+    """
+    Создаёт DataLoader, который возвращает **только** словари ``inputs`` —
+    без меток — для этапа *predict()*.
+    """
 
     def collate_infer(batch):
         inputs_dicts = [b[0] for b in batch]  # drop labels
@@ -34,11 +38,8 @@ def build_pred_dl(dataset, cfg) -> DataLoader:
 
 
 # ---------------------------------------------------------------------------- #
-def purge_stage1_checkpoints(model_dir: Path):
-    """
-    Remove all stage‑1 checkpoints inside one model_X directory.
-    Works regardless of Lightning version/counter flag.
-    """
+def purge_stage1_checkpoints(model_dir: Path) -> None:
+    """Удаляет все чек‑пойнты вида ``*_stage1.ckpt`` в указанной папке."""
     for p in model_dir.glob("*_stage1.ckpt"):
         try:
             p.unlink()
@@ -47,7 +48,11 @@ def purge_stage1_checkpoints(model_dir: Path):
 
 
 # ---------------------------------------------------------------------------- #
-def free_trainer(trainer, *objs):
+def free_trainer(trainer: L.Trainer, *objs) -> None:
+    """
+    Аккуратно освобождает память после завершения обучения:
+    вызов teardown, очистка state оптимизаторов, ``torch.cuda.empty_cache`` и т.д.
+    """
     # teardown (PL 2.4+) or fallback
     if hasattr(trainer, "_teardown"):
         trainer._teardown()
@@ -72,26 +77,28 @@ def train_one_stage(
     cfg_unit,
     model_idx: int,
     fold: int,
-    tokenizer,
-    train_df,
+    train_df: pd.DataFrame,
     eval_on_prompted: bool,
     stage_tag: str,
     init_ckpt: str | None = None,
-    checkpoints_names=None,
-):
+    path_to_finetuned_models: str | None = None,
+) -> None:
     """
-    Train one fold-loop for either stage-1 or stage-2.
+    Обучает **один** фолд на одной стадии (stage‑1 или stage‑2).
 
-    Parameters
-    ----------
+    Параметры
+    ---------
     eval_on_prompted : bool
-        False → train A+B, val on B
-        True  → train B-only, val on A
+        * False — тренируемся на A+B, валидируемся на B (flag 1).
+        * True  — тренируемся только на B, валидируемся на A (flag 0).
     init_ckpt : str | None
-        When stage-2 starts, provide the best .ckpt from stage-1 so we continue.
+        Путь к чек‑пойнту stage‑1, с которого продолжаем stage‑2.
+    path_to_finetuned_models : str | None
+        Если задано, берём дообученные веса DeBERTa из этой папки,
+        иначе из ``OUTPUT_DIR_FINETUNED``.
     """
     # -------- datamodule -------------------------------------------------- #
-    dm = EssayDataModule(cfg_unit, tokenizer, train_df, fold, eval_on_prompted)
+    dm = EssayDataModule(cfg_unit, train_df, fold, eval_on_prompted)
     dm.setup()
 
     # -------- callbacks / logger ------------------------------------------ #
@@ -130,18 +137,14 @@ def train_one_stage(
     if ckpt_path:
         # weights-only: load them into the module, but DON'T give ckpt_path to fit()
         model = EssayScoringPL.load_from_checkpoint(
-            ckpt_path,
-            cfg=cfg_unit,
-            model_key=cfg_unit.model_key,
-            checkpoints_names=checkpoints_names,
-            load_from_existed=True,
+            ckpt_path, cfg=cfg_unit, model_key=cfg_unit.model_key, load_from_existed=True
         )
     else:
         model = EssayScoringPL(
-            cfg_unit,
-            cfg_unit.model_key,
-            checkpoints_names=checkpoints_names,
+            cfg=cfg_unit,
+            model_key=cfg_unit.model_key,
             load_from_existed=False,
+            path_to_finetuned_models=path_to_finetuned_models,
         )
 
     trainer.fit(model=model, datamodule=dm)
@@ -160,9 +163,11 @@ def train_one_stage(
 
 
 # ---------------------------------------------------------------------------- #
-def train_model_lightning(cfg, checkpoints_names, tokenizer_finetuned):
+def train_model_lightning(cfg, path_to_finetuned_models: str | None = None) -> None:
     """
-    Loop over ensemble members; each member goes through stage-1 and stage-2.
+    Верхнеуровневый цикл по *моделям* и *фолдам*:
+    для каждого (model_i, fold_j) выполняет подряд stage‑1 → stage‑2,
+    собирает OOF‑предсказания и чистит stage‑1 чек‑пойнты.
     """
     for model_idx, cfg_unit in enumerate(cfg.ensemble.values()):
         for fold in range(cfg.n_folds):
@@ -174,12 +179,11 @@ def train_model_lightning(cfg, checkpoints_names, tokenizer_finetuned):
                 cfg_unit,
                 model_idx,
                 fold,
-                tokenizer_finetuned,
                 train_df_stage1,
                 eval_on_prompted=False,
                 stage_tag="stage1",
                 init_ckpt=None,
-                checkpoints_names=checkpoints_names,
+                path_to_finetuned_models=path_to_finetuned_models,
             )
 
             # ---------- locate best ckpt per fold --------------------------------- #
@@ -197,11 +201,11 @@ def train_model_lightning(cfg, checkpoints_names, tokenizer_finetuned):
                 cfg_unit,
                 model_idx,
                 fold,
-                tokenizer_finetuned,
                 train_df_stage2,
                 eval_on_prompted=True,
                 stage_tag="stage2",
-                init_ckpt=s1_ckpt,  # callable → fold-specific path
+                init_ckpt=s1_ckpt,
+                path_to_finetuned_models=path_to_finetuned_models,
             )
 
             # ------------- purge Stage‑1 ckpts (they’re no longer needed) ----------

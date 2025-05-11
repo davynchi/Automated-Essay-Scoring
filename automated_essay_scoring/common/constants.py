@@ -1,18 +1,17 @@
 from pathlib import Path
 
-import torch
-
 
 # Fundamental defaults
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-OUTPUT_DIR_FINETUNED = Path("./pretrained_models")
-CACHED_DATA_PATH = Path("./cached_data")
-OUTPUT_DIR_TRAIN = Path("./trained_models")
+OUTPUT_DIR_FINETUNED = Path("./../pretrained_models")
+CACHED_DATA_PATH = Path("./../cached_data")
+OUTPUT_DIR_TRAIN = Path("./../trained_models")
+BEST_ENSEMBLE_WEIGHTS_PATH = Path("./../best_ensemble_weights")
 
 DATA_PATH = Path("./learning-agency-lab-automated-essay-scoring-2")
 TRAIN_FILENAME = "train.csv"
 TEST_FILENAME = "test.csv"
+BEST_ENSEMBLE_WEIGHTS_FILENAME = "best_ensemble_weights.npy"
 PROMPTED_DATA_FILENAME = "persuade_2.0_human_scores_demo_id_github.csv"
 
 TRAIN_TEXT_PATH = CACHED_DATA_PATH / "train_text.txt"
@@ -32,3 +31,4 @@ MODEL_UNIT_CONFIG_NAME = "config.pth"
 
 # File naming convention
 CHECKPOINT_POSTFIX = "_chk"
+BEST_CHECKPOINT_POSTFIX = "_final"

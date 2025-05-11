@@ -6,13 +6,11 @@ import torch.nn as nn
 from transformers import AutoConfig, AutoModel
 
 from .constants import (
-    CHECKPOINT_POSTFIX,
-    DEVICE,
+    BEST_CHECKPOINT_POSTFIX,
     MODEL_UNIT_CONFIG_NAME,
     NAMES_OF_MODELS,
     OUTPUT_DIR_FINETUNED,
 )
-from .utils import get_model_path
 
 
 class MeanPooling(nn.Module):
@@ -35,7 +33,7 @@ class CustomModel(nn.Module):
         self,
         cfg,
         load_from_existed,
-        checkpoints_names=None,
+        path_to_finetuned_models=None,
         config_path=None,
         pretrained=False,
     ):
@@ -55,7 +53,7 @@ class CustomModel(nn.Module):
 
         self.config.update(cfg.base.model_config)
 
-        if checkpoints_names is None or load_from_existed:
+        if load_from_existed:
             if pretrained:
                 self.model = AutoModel.from_pretrained(
                     NAMES_OF_MODELS[cfg.model_key], config=self.config
@@ -63,10 +61,17 @@ class CustomModel(nn.Module):
             else:
                 self.model = AutoModel.from_config(self.config)
         else:
+            path_to_finetuned_models = (
+                Path(path_to_finetuned_models)
+                if path_to_finetuned_models
+                else OUTPUT_DIR_FINETUNED
+            )
             self.model = AutoModel.from_pretrained(
-                OUTPUT_DIR_FINETUNED
-                / (NAMES_OF_MODELS[cfg.model_key].replace("/", "-") + CHECKPOINT_POSTFIX)
-                / checkpoints_names[cfg.model_key]
+                path_to_finetuned_models
+                / (
+                    NAMES_OF_MODELS[cfg.model_key].replace("/", "-")
+                    + BEST_CHECKPOINT_POSTFIX
+                )
             )
 
         # ── 2)  save config the first time we ever create it  ───────────── #
@@ -107,12 +112,12 @@ class CustomModelMeanPooling(CustomModel):
         self,
         cfg,
         load_from_existed,
-        checkpoints_names=None,
+        path_to_finetuned_models=None,
         config_path=None,
         pretrained=False,
     ):
         super().__init__(
-            cfg, load_from_existed, checkpoints_names, config_path, pretrained
+            cfg, load_from_existed, path_to_finetuned_models, config_path, pretrained
         )
 
         self.pool = MeanPooling()
@@ -121,7 +126,6 @@ class CustomModelMeanPooling(CustomModel):
         self.layer_norm1 = nn.LayerNorm(self.config.hidden_size)
 
     def feature(self, inputs):
-        # print(self.model.device)
         outputs = self.model(**inputs)
         last_hidden_states = outputs[0]
         feature = self.pool(last_hidden_states, inputs["attention_mask"])
@@ -133,12 +137,12 @@ class CustomModelAttention(CustomModel):
         self,
         cfg,
         load_from_existed,
-        checkpoints_names=None,
+        path_to_finetuned_models=None,
         config_path=None,
         pretrained=False,
     ):
         super().__init__(
-            cfg, load_from_existed, checkpoints_names, config_path, pretrained
+            cfg, load_from_existed, path_to_finetuned_models, config_path, pretrained
         )
 
         self.fc = nn.Linear(self.config.hidden_size, self.cfg.base.target_size)
@@ -164,12 +168,12 @@ class CustomModelLSTM(CustomModel):
         self,
         cfg,
         load_from_existed,
-        checkpoints_names=None,
+        path_to_finetuned_models=None,
         config_path=None,
         pretrained=False,
     ):
         super().__init__(
-            cfg, load_from_existed, checkpoints_names, config_path, pretrained
+            cfg, load_from_existed, path_to_finetuned_models, config_path, pretrained
         )
 
         self.pool = MeanPooling()
@@ -199,30 +203,3 @@ HEAD_CLASS_MAPPING = {
     "attention": CustomModelAttention,
     "lstm": CustomModelLSTM,
 }
-
-
-def create_model(cfg, fold, load_from_existed, checkpoints_names=None):
-    model_class = HEAD_CLASS_MAPPING.get(cfg.head)
-    if model_class is None:
-        raise ValueError(f"Invalid head type: {cfg.head}")
-    config_path = Path(cfg.path) / MODEL_UNIT_CONFIG_NAME
-    if checkpoints_names is None or load_from_existed:
-        model = model_class(
-            cfg,
-            checkpoints_names=checkpoints_names,
-            load_from_existed=load_from_existed,
-            config_path=config_path,
-            pretrained=False,
-        )
-        state = torch.load(
-            get_model_path(cfg, fold),
-            # map_location=torch.device("cpu"),
-            map_location=DEVICE,
-            weights_only=False,
-        )
-        model.load_state_dict(state["model"])
-    else:
-        model = model_class(cfg, checkpoints_names, config_path=None, pretrained=True)
-        torch.save(model.config, config_path)
-    model.to(DEVICE)
-    return model
