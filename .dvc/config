@@ -1,7 +1,7 @@
 [core]
-    remote = storage-s3
-['remote "storage-s3"']
-    url = s3://lab-essay-scoring-storage
-    endpointurl = https://s3.eu-central-1.amazonaws.com
+    remote = storage-cloud
+['remote "storage-cloud"']
+    url = s3://automated-essay-scoring-storage
+    endpointurl = https://automated-essay-scoring-storage.s3.cloud.ru
     access_key_id = ""
     secret_access_key = ""
