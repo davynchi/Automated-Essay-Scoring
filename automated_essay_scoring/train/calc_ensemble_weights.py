@@ -1,13 +1,14 @@
 import logging
 from pathlib import Path
+from typing import Tuple
 
 import mlflow
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 
-from .constants import BEST_ENSEMBLE_WEIGHTS_FILENAME, BEST_ENSEMBLE_WEIGHTS_PATH
-from .utils import get_result, get_score
+from ..common.constants import BEST_ENSEMBLE_WEIGHTS_FILENAME, BEST_ENSEMBLE_WEIGHTS_PATH
+from ..common.utils import get_score
 
 
 log = logging.getLogger(__name__)
@@ -30,6 +31,38 @@ def load_all_folds(model_dir: Path) -> pd.DataFrame:
         raise FileNotFoundError(f"No OOF pickle found in {model_dir}")
     dfs = [pd.read_pickle(p) for p in pkls]
     return pd.concat(dfs, ignore_index=True)
+
+
+def get_result(
+    target_cols: list[str], oof_df: pd.DataFrame, pred_col: str = "pred"
+) -> Tuple[float, float]:
+    """Compute overall and unprompted QWK scores for OOF predictions.
+
+    Logs and returns:
+      - score on all examples
+      - score on subset where `flag == 1` (unprompted)
+
+    Args:
+        target_cols (list[str]): Column names of true labels in `oof_df`.
+        oof_df (pd.DataFrame): DataFrame with true labels, predictions, and `flag`.
+        pred_col (str): Column name of predictions in `oof_df`.
+
+    Returns:
+        Tuple[float, float]: (all_texts_score, unprompted_texts_score).
+    """
+    y_true_all = oof_df[target_cols].values
+    y_pred_all = oof_df[pred_col].values
+    score_all = get_score(y_true_all, y_pred_all)
+
+    mask = oof_df["flag"] == 1
+    y_true_up = oof_df.loc[mask, target_cols].values
+    y_pred_up = oof_df.loc[mask, pred_col].values
+    score_up = get_score(y_true_up, y_pred_up)
+
+    logging.getLogger(__name__).info(
+        f"Score: {score_all:.4f}, Unprompted Score: {score_up:.4f}"
+    )
+    return score_all, score_up
 
 
 def get_oof_preds(cfg) -> pd.DataFrame:

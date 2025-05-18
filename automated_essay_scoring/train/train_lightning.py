@@ -1,4 +1,5 @@
 import gc
+from glob import glob
 from pathlib import Path
 
 import pandas as pd
@@ -8,11 +9,84 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import MLFlowLogger
 from torch.utils.data import DataLoader
 from torch.utils.data._utils.collate import default_collate
+from transformers import DebertaTokenizer
 
-from .data_modules import EssayDataModule
-from .dataset import collate
-from .lightning_modules import EssayScoringPL
-from .modify_train_data import load_pickle_data, tokenize_text
+from ..common.constants import PATH_TO_TOKENIZER, TRAIN_PICKLE_PATH
+from ..common.utils import create_tokenizer, remove_files
+from ..dataset.data_modules import EssayDataModule
+from ..dataset.dataset import collate
+from ..model.lightning_modules import EssayScoringPL
+
+
+def tokenize_text(
+    data: pd.DataFrame, path_to_tokenizer: str = PATH_TO_TOKENIZER
+) -> DebertaTokenizer:
+    """Compute token lengths and sort DataFrame by length for efficient padding.
+
+    Adds a `length` column and sorts `data` in-place by ascending token count.
+
+    Args:
+        data (pd.DataFrame): DataFrame with `full_text` column.
+        path_to_tokenizer (str): Tokenizer path or identifier.
+
+    Returns:
+        DebertaTokenizer: Tokenizer used for encoding.
+    """
+    tokenizer = create_tokenizer(path=path_to_tokenizer)
+
+    def _encode(text: str) -> int:
+        return len(tokenizer.encode(text))
+
+    data["length"] = data["full_text"].map(_encode)
+    data.sort_values("length", ascending=True, inplace=True)
+    data.reset_index(drop=True, inplace=True)
+    return tokenizer
+
+
+def load_pickle_data(cfg_unit, load_from_existed_pickle: bool) -> pd.DataFrame:
+    """Load or blend training DataFrame for a given ensemble member.
+
+    In Stage-1 (load_from_existed_pickle=False), adds column `score_s` as `score / 5`.
+    In Stage-2 (load_from_existed_pickle=True), merges model's OOF predictions and
+    blends with the true scores using `cfg_unit.base.sl_rate` for self-learning.
+
+    Args:
+        cfg_unit: Configuration object for the ensemble member, must have `path`,
+            `base.target_cols`, `base.modif_target_cols`, and `base.sl_rate`.
+        load_from_existed_pickle (bool): Whether to perform Stage-2 blending.
+
+    Returns:
+        pd.DataFrame: DataFrame containing columns `essay_id`, `text`, `score`,
+            `flag`, `fold`, and `score_s` (modified target column).
+
+    Raises:
+        FileNotFoundError: If expected OOF pickle files are not found in Stage-2.
+    """
+    train = pd.read_pickle(TRAIN_PICKLE_PATH)
+
+    if load_from_existed_pickle:
+        oof_paths = sorted(glob(str(Path(cfg_unit.path) / "oof_fold*.pkl")))
+        if not oof_paths:
+            # No OOF files: fallback to Stage-1 behavior
+            train[cfg_unit.base.modif_target_cols[0]] = (
+                train[cfg_unit.base.target_cols[0]].values / 5
+            )
+            return train
+
+        oof_list = [pd.read_pickle(p) for p in oof_paths]
+        oof = pd.concat(oof_list, ignore_index=True)
+
+        # Merge and blend
+        train = train.merge(oof[["essay_id", "pred"]], on="essay_id", how="left")
+        train[cfg_unit.base.modif_target_cols[0]] = (
+            (train[cfg_unit.base.target_cols[0]].values / 5) * (1 - cfg_unit.base.sl_rate)
+        ) + (train["pred"].fillna(0).values * cfg_unit.base.sl_rate)
+    else:
+        train[cfg_unit.base.modif_target_cols[0]] = (
+            train[cfg_unit.base.target_cols[0]].values / 5
+        )
+
+    return train
 
 
 def build_pred_dl(dataset, cfg) -> DataLoader:
@@ -41,19 +115,6 @@ def build_pred_dl(dataset, cfg) -> DataLoader:
         num_workers=cfg.base.num_workers,
         pin_memory=True,
     )
-
-
-def purge_stage1_checkpoints(model_dir: Path) -> None:
-    """Remove all stage-1 checkpoint files from a directory.
-
-    Args:
-        model_dir (Path): Path to the directory containing checkpoints.
-    """
-    for ckpt in model_dir.glob("*_stage1.ckpt"):
-        try:
-            ckpt.unlink()
-        except FileNotFoundError:
-            pass
 
 
 def free_trainer(trainer: L.Trainer, *objs) -> None:
@@ -234,4 +295,4 @@ def train_model_lightning(cfg, path_to_finetuned_models: str | None = None) -> N
             )
 
             # Purge stage-1 ckpts
-            purge_stage1_checkpoints(Path(cfg_unit.path))
+            remove_files(Path(cfg_unit.path), pattern="*_stage1.ckpt")

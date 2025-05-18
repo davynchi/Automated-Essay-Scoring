@@ -9,13 +9,14 @@ from hydra import compose, initialize
 from lightning.pytorch import seed_everything
 from omegaconf import OmegaConf
 
-from .common.calc_ensemble_weights import calc_best_weights_for_ensemble
-from .common.finetune_model import finetune_model
-from .common.inference_lightning import make_submission_lightning
+from .common.constants import OUTPUT_DIR_TRAIN
 from .common.logging_config import configure_logging
-from .common.modify_train_data import modify_train_data
-from .common.train_lightning import train_model_lightning
-from .common.utils import create_paths, register_new_utf_errors, set_torch_params
+from .common.utils import register_new_utf_errors, set_torch_params
+from .finetune.finetune_model import finetune_model
+from .inference.inference_lightning import make_submission_lightning
+from .preprocessing.modify_train_data import modify_train_data
+from .train.calc_ensemble_weights import calc_best_weights_for_ensemble
+from .train.train_lightning import train_model_lightning
 
 
 def start_logging() -> logging.Logger:
@@ -60,6 +61,24 @@ def load_config() -> "omegaconf.DictConfig":
         cfg = compose(config_name="defaults")
     OmegaConf.set_struct(cfg, False)
     return cfg
+
+
+def create_paths(cfg) -> None:
+    """Create output directories for each ensemble model and store in config.
+
+    For each model config in `cfg.ensemble`, creates
+    `OUTPUT_DIR_TRAIN/model_i` and assigns its string path to `model_cfg['path']`.
+
+    Args:
+        cfg: Configuration object with `ensemble` mapping.
+
+    Returns:
+        None
+    """
+    for i, model_cfg in enumerate(cfg.ensemble.values()):
+        dirpath = OUTPUT_DIR_TRAIN / f"model_{i}"
+        dirpath.mkdir(parents=True, exist_ok=True)
+        model_cfg["path"] = str(dirpath)
 
 
 def train_and_submit_model(

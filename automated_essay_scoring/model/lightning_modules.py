@@ -7,8 +7,8 @@ import torch.nn as nn
 from torch.optim import AdamW
 from transformers import get_cosine_schedule_with_warmup, get_linear_schedule_with_warmup
 
+from ..common.utils import get_score
 from .model import HEAD_CLASS_MAPPING
-from .utils import get_score
 
 
 class EssayScoringPL(L.LightningModule):

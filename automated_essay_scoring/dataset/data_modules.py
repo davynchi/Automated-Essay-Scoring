@@ -4,10 +4,10 @@ import torch
 from torch.utils.data import DataLoader
 from torch.utils.data._utils.collate import default_collate
 
-from .constants import PATH_TO_TOKENIZER
+from ..common.constants import PATH_TO_TOKENIZER
+from ..common.utils import create_tokenizer
 from .dataset import LALDataset
 from .dataset import collate as clip_to_max_len
-from .modify_train_data import create_tokenizer
 
 
 def lightning_collate(batch):

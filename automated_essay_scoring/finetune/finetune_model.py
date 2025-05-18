@@ -11,7 +11,7 @@ from transformers import (
     TrainingArguments,
 )
 
-from .constants import (
+from ..common.constants import (
     BEST_CHECKPOINT_POSTFIX,
     CHECKPOINT_POSTFIX,
     NAMES_OF_MODELS,
@@ -20,7 +20,7 @@ from .constants import (
     TRAIN_TEXT_PATH,
     VAL_TEXT_PATH,
 )
-from .modify_train_data import create_tokenizer
+from ..common.utils import create_tokenizer
 
 
 def load_model(model_name: str) -> DebertaV2ForMaskedLM:

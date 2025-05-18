@@ -10,7 +10,7 @@ from pytorch_lightning import Trainer
 from torch.utils.data import DataLoader
 from torch.utils.data._utils.collate import default_collate
 
-from .constants import (
+from ..common.constants import (
     BEST_ENSEMBLE_WEIGHTS_FILENAME,
     BEST_ENSEMBLE_WEIGHTS_PATH,
     DATA_PATH,
@@ -19,10 +19,14 @@ from .constants import (
     SUBMISSION_PATH,
     TEST_FILENAME,
 )
-from .dataset import LALDataset, collate
-from .lightning_modules import EssayScoringPL
-from .modify_train_data import create_tokenizer, modify_texts
-from .utils import get_essay_score
+from ..common.utils import (
+    create_tokenizer,
+    find_latest_file,
+    get_essay_score,
+    modify_texts,
+)
+from ..dataset.dataset import LALDataset, collate
+from ..model.lightning_modules import EssayScoringPL
 
 
 log = logging.getLogger(__name__)
@@ -32,36 +36,14 @@ def load_test() -> pd.DataFrame:
     """Load and normalize the test dataset.
 
     Reads the test CSV file from `DATA_PATH / TEST_FILENAME`, applies
-    text modifications in place, and returns the first 128 examples.
+    text modifications in place.
 
     Returns:
-        pd.DataFrame: Normalized test DataFrame limited to 128 rows.
+        pd.DataFrame: Normalized test DataFrame.
     """
     test = pd.read_csv(DATA_PATH / TEST_FILENAME)
     modify_texts(test, "full_text")
     return test[:128]
-
-
-def fold_stage2_ckpt(model_dir: Path, model_idx: int, fold: int) -> str:
-    """Find the latest stage-2 checkpoint for a given model index and fold.
-
-    Args:
-        model_dir (Path): Directory containing checkpoint files.
-        model_idx (int): Index of the model within the ensemble.
-        fold (int): Fold number used in checkpoint filenames.
-
-    Returns:
-        str: Filesystem path to the most recently modified checkpoint file.
-
-    Raises:
-        FileNotFoundError: If no checkpoint files match the expected pattern.
-    """
-    pattern = f"model{model_idx}_fold{fold}_stage2.ckpt"
-    matches = list(model_dir.glob(pattern))
-    if not matches:
-        raise FileNotFoundError(f"No ckpt matches {pattern}")
-    # Return the newest checkpoint in case there are multiple
-    return max(matches, key=lambda p: p.stat().st_mtime).as_posix()
 
 
 def collate_infer(batch) -> dict[str, torch.Tensor]:
@@ -162,7 +144,9 @@ def make_submission_lightning(cfg) -> None:
 
         fold_preds: list[np.ndarray] = []
         for fold in range(cfg.n_folds):
-            ckpt = fold_stage2_ckpt(Path(cfg_unit.path), model_idx, fold)
+            ckpt = find_latest_file(
+                Path(cfg_unit.path), pattern=f"model{model_idx}_fold{fold}_stage2.ckpt"
+            )
             pl_module = EssayScoringPL.load_from_checkpoint(
                 ckpt,
                 cfg=cfg_unit,

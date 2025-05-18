@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from transformers import AutoConfig, AutoModel
 
-from .constants import (
+from ..common.constants import (
     BEST_CHECKPOINT_POSTFIX,
     MODEL_UNIT_CONFIG_NAME,
     NAMES_OF_MODELS,
