@@ -23,56 +23,58 @@ from .constants import (
 from .modify_train_data import create_tokenizer
 
 
-def load_model(model_name: str) -> "DebertaV2ForMaskedLM":
+def load_model(model_name: str) -> DebertaV2ForMaskedLM:
+    """Load a pretrained DeBERTa-v3 model for Masked Language Modeling.
+
+    Args:
+        model_name (str): HuggingFace model identifier,
+            e.g., `"microsoft/deberta-v3-base"`.
+
+    Returns:
+        DebertaV2ForMaskedLM: The loaded model ready for fine-tuning.
     """
-    Загружает предобученную DeBERTa‑v3 для задачи Masked‑LM.
+    return DebertaV2ForMaskedLM.from_pretrained(model_name)
 
-    Параметры
-    ---------
-    model_name : str
-        HuggingFace‑идентификатор модели (пример: 'microsoft/deberta-v3-base').
 
-    Возврат
-    -------
-    DebertaV2ForMaskedLM
-        Инициализированная модель.
+def load_datasets() -> tuple[datasets.DatasetDict, datasets.DatasetDict]:
+    """Load raw text datasets for pretraining and validation.
+
+    Reads two text files (TRAIN_TEXT_PATH, VAL_TEXT_PATH) produced by
+    `modify_train_data.create_train_val_files`, using the HuggingFace `datasets` library.
+
+    Returns:
+        Tuple[datasets.DatasetDict, datasets.DatasetDict]:
+            - raw_train_dataset: DatasetDict with a `"train"` split from TRAIN_TEXT_PATH.
+            - raw_valid_dataset: DatasetDict with a `"train"` split from VAL_TEXT_PATH.
     """
-    model = DebertaV2ForMaskedLM.from_pretrained(model_name)
-    return model
-
-
-def load_datasets() -> tuple["datasets.DatasetDict", "datasets.DatasetDict"]:
-    """
-    Читает два текстовых файла, сформированных функцией
-    ``modify_train_data`` (train/val), через библиотеку *datasets*.
-
-    Возврат
-    -------
-    (train_ds, valid_ds)
-        Сырые текстовые датасеты без токенизации.
-    """
-    # Load raw text datasets using the datasets library
     raw_train_dataset = load_dataset("text", data_files={"train": str(TRAIN_TEXT_PATH)})
     raw_valid_dataset = load_dataset("text", data_files={"train": str(VAL_TEXT_PATH)})
     return raw_train_dataset, raw_valid_dataset
 
 
 def tokenize_datasets(
-    raw_train_dataset,
-    raw_valid_dataset,
+    raw_train_dataset: datasets.DatasetDict,
+    raw_valid_dataset: datasets.DatasetDict,
     tokenizer,
     block_size: int,
-) -> tuple["datasets.Dataset", "datasets.Dataset"]:
-    """
-    Токенизирует датасеты, нарезая тексты фиксированными блоками
-    длиной ``block_size``.
+) -> tuple[datasets.Dataset, datasets.Dataset]:
+    """Tokenize raw text datasets into fixed-length blocks.
 
-    Возврат
-    -------
-    tokenized_train_ds, tokenized_valid_ds
+    Applies `tokenizer` to each split, truncating or padding
+    sequences to `block_size` tokens and removing the raw `"text"` column.
+
+    Args:
+        raw_train_dataset (datasets.DatasetDict): DatasetDict with a `"train"` split.
+        raw_valid_dataset (datasets.DatasetDict): DatasetDict with a `"train"` split.
+        tokenizer: A tokenizer implementing `__call__(text, truncation, max_length)`.
+        block_size (int): Maximum sequence length for tokenization.
+
+    Returns:
+        Tuple[datasets.Dataset, datasets.Dataset]:
+            - tokenized_train_dataset: Tokenized `raw_train_dataset["train"]`.
+            - tokenized_valid_dataset: Tokenized `raw_valid_dataset["train"]`.
     """
 
-    # Tokenize datasets with loop variables bound as default arguments
     def tokenize_function(examples, tokenizer=tokenizer, block_size=block_size):
         return tokenizer(examples["text"], truncation=True, max_length=block_size)
 
@@ -87,14 +89,21 @@ def tokenize_datasets(
 
 
 def finetune_model(cfg) -> None:
-    """
-    Запускает дообучение Masked‑LM **для каждой** модели,
-    перечисленной в ``NAMES_OF_MODELS``.
+    """Fine-tune multiple Masked-LM models listed in configuration.
 
-    * Создаёт каталоги ``OUTPUT_DIR_FINETUNED``.
-    * Сохраняет лучший чек‑пойнт по ``eval_loss`` в подпапку
-      ``*_final`` и удаляет промежуточные.
-    * Очищает CUDA‑память между циклами.
+    For each model in `NAMES_OF_MODELS`:
+      1. Creates a fresh tokenizer.
+      2. Loads a pretrained DeBERTa-v3 via `load_model`.
+      3. Loads and tokenizes train/validation datasets.
+      4. Sets up a `Trainer` with `TrainingArguments` from `cfg.pretrain`.
+      5. Runs `trainer.train()`, saves the best checkpoint by eval_loss.
+      6. Cleans up intermediate checkpoints and frees CUDA memory.
+
+    Args:
+        cfg: Configuration object containing:
+            - `pretrain.line_by_line_text_dataset.block_size` (int)
+            - `pretrain.collator` (dict of DataCollatorForLanguageModeling kwargs)
+            - `pretrain.training_arguments` (dict of TrainingArguments kwargs)
     """
     for model_name in NAMES_OF_MODELS.values():
         tokenizer = create_tokenizer(path=PATH_TO_TOKENIZER)
@@ -103,8 +112,7 @@ def finetune_model(cfg) -> None:
         block_size = cfg.pretrain.line_by_line_text_dataset.block_size
 
         raw_train_dataset, raw_valid_dataset = load_datasets()
-
-        tokenized_train_dataset, tokenized_valid_dataset = tokenize_datasets(
+        tokenized_train, tokenized_valid = tokenize_datasets(
             raw_train_dataset, raw_valid_dataset, tokenizer, block_size
         )
 
@@ -112,28 +120,27 @@ def finetune_model(cfg) -> None:
             tokenizer=tokenizer, **cfg.pretrain.collator
         )
 
-        PATH_TO_SAVE_MODEL = OUTPUT_DIR_FINETUNED / (
+        save_dir = OUTPUT_DIR_FINETUNED / (
             model_name.replace("/", "-") + CHECKPOINT_POSTFIX
         )
-        PATH_TO_SAVE_BEST_MODEL = OUTPUT_DIR_FINETUNED / (
+        best_dir = OUTPUT_DIR_FINETUNED / (
             model_name.replace("/", "-") + BEST_CHECKPOINT_POSTFIX
         )
 
         training_args = TrainingArguments(
-            output_dir=PATH_TO_SAVE_MODEL, **cfg.pretrain.training_arguments
+            output_dir=save_dir, **cfg.pretrain.training_arguments
         )
-
         trainer = Trainer(
             model=model,
             args=training_args,
             data_collator=data_collator,
-            train_dataset=tokenized_train_dataset,
-            eval_dataset=tokenized_valid_dataset,
+            train_dataset=tokenized_train,
+            eval_dataset=tokenized_valid,
         )
 
         trainer.train()
-        trainer.save_model(PATH_TO_SAVE_BEST_MODEL)
+        trainer.save_model(best_dir)
 
-        shutil.rmtree(PATH_TO_SAVE_MODEL)
+        shutil.rmtree(save_dir)
         torch.cuda.empty_cache()
         gc.collect()

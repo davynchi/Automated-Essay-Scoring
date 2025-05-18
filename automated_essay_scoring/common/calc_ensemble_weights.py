@@ -14,7 +14,17 @@ log = logging.getLogger(__name__)
 
 
 def load_all_folds(model_dir: Path) -> pd.DataFrame:
-    """Склейка всех файлов ``oof_fold*.pkl`` в один DataFrame."""
+    """Собирает все OOF-pickle файлы в один DataFrame.
+
+    Args:
+        model_dir (Path): Путь к директории с файлами вида `oof_fold*.pkl`.
+
+    Returns:
+        pd.DataFrame: Объединённый DataFrame по всем фолдам.
+
+    Raises:
+        FileNotFoundError: Если в директории `model_dir` не найдено ни одного файла.
+    """
     pkls = sorted(model_dir.glob("oof_fold*.pkl"))
     if not pkls:
         raise FileNotFoundError(f"No OOF pickle found in {model_dir}")
@@ -23,11 +33,30 @@ def load_all_folds(model_dir: Path) -> pd.DataFrame:
 
 
 def get_oof_preds(cfg) -> pd.DataFrame:
-    """
-    Формирует общую таблицу OOF‑предсказаний для всех участников ансамбля
-    (по id‑эссе), логируя индивидуальные метрики в MLflow.
-    """
+    """Формирует общую таблицу OOF-предсказаний для всех моделей ансамбля.
 
+    Для каждой модели в `cfg.ensemble`:
+      - загружает предсказания всех фолдов через `load_all_folds`
+      - вычисляет метрики качества `get_result` и логирует их в MLflow
+      - объединяет столбцы предсказаний `pred_{i}` для каждого `essay_id`
+
+    Args:
+        cfg: Конфигурация, полученная от Hydra.
+            Должна содержать атрибут `ensemble` (mapping)
+            и у каждого элемента — `path` и `base.target_cols`.
+
+    Returns:
+        pd.DataFrame:
+            DataFrame со столбцами:
+                - essay_id
+                - fold
+                - flag
+                - целевые колонки из `cfg.base.target_cols`
+                - pred_0, pred_1, ..., pred_{n_models-1}
+
+    Raises:
+        FileNotFoundError: Если для какой-то модели не найдено OOF-файлов.
+    """
     for i, cfg_unit in enumerate(cfg.ensemble.values()):
         oof_df = load_all_folds(Path(cfg_unit.path))
 
@@ -43,8 +72,8 @@ def get_oof_preds(cfg) -> pd.DataFrame:
                 ["essay_id", "fold", "flag"] + cfg_unit.base.target_cols + ["pred"]
             ].rename(columns={"pred": f"pred_{i}"})
         else:
-            oof_df = oof_df[["essay_id", "pred"]].rename(columns={"pred": f"pred_{i}"})
-            df_oof = pd.merge(df_oof, oof_df, on="essay_id", how="left").reset_index(
+            oof_small = oof_df[["essay_id", "pred"]].rename(columns={"pred": f"pred_{i}"})
+            df_oof = pd.merge(df_oof, oof_small, on="essay_id", how="left").reset_index(
                 drop=True
             )
 
@@ -52,93 +81,81 @@ def get_oof_preds(cfg) -> pd.DataFrame:
     return df_oof
 
 
-def calc_best_weights_for_ensemble(cfg):
-    """
-    Подбирает веса ансамбля с помощью Nelder–Mead так,
-    чтобы максимизировать QWK на каждом фолде, затем усредняет веса.
+def calc_best_weights_for_ensemble(cfg) -> np.ndarray:
+    """Подбирает и сохраняет оптимальные веса для ансамбля моделей.
 
-    * Сохраняет ``best_ensemble_weights.npy``.
-    * Логирует финальные метрики и найденные веса в MLflow.
+    Используется алгоритм Nelder–Mead для максимизации QWK на каждом фолде:
+      1. Получает OOF-предсказания через `get_oof_preds`
+      2. Для каждого фолда минимизирует отрицательное значение `get_score`
+      3. Усредняет найденные вектора весов, нормирует их и сохраняет в файл
+      4. Логирует финальный скор ансамбля и веса в MLflow
+      5. Вычисляет и логирует скор финального смешанного предсказания
 
-    Возврат
-    -------
-    np.ndarray
-        Итоговый нормированный вектор весов (shape = [n_models]).
+    В результате сохраняется файл
+    `<BEST_ENSEMBLE_WEIGHTS_PATH>/best_ensemble_weights.npy`.
+
+    Args:
+        cfg: Конфигурация, полученная от Hydra.
+            Должна содержать атрибуты:
+            - `ensemble` (mapping моделей)
+            - `base.target_cols` (список целевых колонок)
+            - `n_folds` (число фолдов)
+
+    Returns:
+        np.ndarray:
+            Нормированный вектор весов ансамбля формы `(n_models,)`.
     """
     df_oof = get_oof_preds(cfg)
     y_values = df_oof[cfg.base.target_cols].values
 
     predictions = []
-    lls = []
-    wghts = []
+    losses_per_fold = []
+    weights_per_fold = []
 
-    def loss_func(weights, train_idx, predictions):
-        final_prediction = 0
-        for weight, prediction in zip(weights, predictions, strict=True):
-            final_prediction += weight * prediction[train_idx]
-
-        score = get_score(y_values[train_idx], final_prediction)
+    def loss_func(weights, train_idx, preds):
+        """Вспомогательная функция для оптимизации QWK."""
+        final_pred = np.sum(
+            [w * preds[j][train_idx] for j, w in enumerate(weights)], axis=0
+        )
+        score = get_score(y_values[train_idx], final_pred)
         return -score
 
-    num_models_in_ensemble = len(cfg.ensemble)
-    for i in range(num_models_in_ensemble):
-        predictions.append(df_oof[f"pred_{i}"].values)
+    num_models = len(cfg.ensemble)
+    predictions = [df_oof[f"pred_{i}"].values for i in range(num_models)]
 
     for fold in range(cfg.n_folds):
-        starting_values = [1 / num_models_in_ensemble] * num_models_in_ensemble
+        start = [1 / num_models] * num_models
         res = minimize(
             loss_func,
-            starting_values,
-            args=(
-                df_oof.loc[df_oof.fold == fold].index,
-                predictions,
-            ),
+            start,
+            args=(df_oof[df_oof.fold == fold].index, predictions),
             method="Nelder-Mead",
             tol=1e-6,
         )
+        losses_per_fold.append(res.fun)
+        weights_per_fold.append(res.x)
 
-        lls.append(res["fun"])
-        wghts.append(res["x"])
+    # Средний скор (отрицательный в оптимизации) и нормировка весов
+    avg_loss = np.mean(losses_per_fold)
+    best_weights = np.mean(weights_per_fold, axis=0)
+    best_weights /= best_weights.sum()
 
-    best_ens_score = np.mean(lls)
-    log.info("\n Ensemble Score: {best_score:.7f}".format(best_score=-best_ens_score))
-    mlflow.log_metric("ensemble_score", -best_ens_score)
-
-    best_weights = np.mean(wghts, axis=0)
-    best_weights = best_weights / best_weights.sum()
-    log.info("\n Best Weights: {weights:}".format(weights=best_weights))
+    log.info(f"Ensemble Score: {-avg_loss:.7f}")
+    mlflow.log_metric("ensemble_score", -avg_loss)
+    log.info(f"Best Weights: {best_weights}")
     mlflow.log_param("best_weights", best_weights)
 
+    # Смешанное предсказание
     df_oof["blending"] = np.sum(
-        best_weights * df_oof[[f"pred_{j}" for j in range(num_models_in_ensemble)]],
+        best_weights * df_oof[[f"pred_{j}" for j in range(num_models)]],
         axis=1,
     )
+    blend_all, blend_unprompt = get_result(cfg.base.target_cols, df_oof, "blending")
+    mlflow.log_metric("blending_score_all_texts", blend_all)
+    mlflow.log_metric("blending_score_unprompted_texts", blend_unprompt)
 
-    blending_score_all_texts, blending_score_unprompted_texts = get_result(
-        cfg.base.target_cols, df_oof, "blending"
-    )
-    mlflow.log_metric("blending_score_all_texts", blending_score_all_texts)
-    mlflow.log_metric("blending_score_unprompted_texts", blending_score_unprompted_texts)
-
-    # # 1. Диапазон и уникальность прогнозов
-    # print(df_oof[[f"pred_{i}" for i in range(4)]].describe())
-    # print(df_oof[[f"pred_{i}" for i in range(4)]].corr())
-
-    # # 2. Попробовать другой старт
-    # for _ in range(3):
-    #     start = np.random.dirichlet(np.ones(len(cfg.ensemble)))
-    #     res = minimize(
-    #         loss_func,
-    #         start,
-    #         args=(
-    #             df_oof.loc[df_oof.fold == fold].index,
-    #             predictions,
-    #         ),
-    #         method="Nelder-Mead",
-    #         tol=1e-6,
-    #     )
-    #     print(res.x, -res.fun)
-
+    # Сохранение весов на диск
     BEST_ENSEMBLE_WEIGHTS_PATH.mkdir(parents=True, exist_ok=True)
     np.save(BEST_ENSEMBLE_WEIGHTS_PATH / BEST_ENSEMBLE_WEIGHTS_FILENAME, best_weights)
+
     return best_weights
