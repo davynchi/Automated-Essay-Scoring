@@ -1,0 +1,7 @@
+[core]
+    remote = storage-s3
+['remote "storage-s3"']
+    url = s3://lab-essay-scoring-storage
+    endpointurl = https://s3.eu-central-1.amazonaws.com
+    access_key_id = ""
+    secret_access_key = ""
