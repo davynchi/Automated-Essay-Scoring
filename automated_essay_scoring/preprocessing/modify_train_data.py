@@ -1,11 +1,12 @@
 from pathlib import Path
 
+import dvc.api
 import pandas as pd
 from iterstrat.ml_stratifiers import MultilabelStratifiedKFold
 
 from ..common.constants import (
-    DATA_PATH,
     PROMPTED_DATA_FILENAME,
+    RAW_DATA_PATH,
     TRAIN_FILENAME,
     TRAIN_PICKLE_PATH,
     TRAIN_TEXT_PATH,
@@ -17,14 +18,20 @@ from ..common.utils import modify_texts
 def read_train_dataset() -> pd.DataFrame:
     """Read and rename columns of the original training CSV.
 
-    Reads `DATA_PATH/TRAIN_FILENAME`, renames columns to `id`, `text`, `score`.
+    Reads train datframe, renames columns to `id`, `text`, `score`.
 
     Returns:
         pd.DataFrame: DataFrame with columns `id`, `text`, `score`.
     """
-    train = pd.read_csv(DATA_PATH / TRAIN_FILENAME)
-    train.columns = ["id", "text", "score"]
-    return train
+    with dvc.api.open(
+        path=str(RAW_DATA_PATH / TRAIN_FILENAME),
+        repo=".",
+        rev="HEAD",
+        mode="r",
+    ) as fd:
+        train = pd.read_csv(fd)
+        train.columns = ["id", "text", "score"]
+        return train
 
 
 def divide_train_into_folds(train: pd.DataFrame, n_splits: int) -> None:
@@ -63,13 +70,19 @@ def set_flag_using_prompted_data(train: pd.DataFrame) -> pd.DataFrame:
     Returns:
         pd.DataFrame: Merged DataFrame including `flag` column.
     """
-    prompted_data = pd.read_csv(DATA_PATH / PROMPTED_DATA_FILENAME)
-    merged = pd.merge(
-        train, prompted_data, left_on="text", right_on="full_text", how="left"
-    )
-    merged["flag"] = 0
-    merged.loc[merged["prompt_name"].isna(), "flag"] = 1
-    return merged
+    with dvc.api.open(
+        path=str(RAW_DATA_PATH / PROMPTED_DATA_FILENAME),
+        repo=".",
+        rev="HEAD",
+        mode="r",
+    ) as fd:
+        prompted_data = pd.read_csv(fd)
+        merged = pd.merge(
+            train, prompted_data, left_on="text", right_on="full_text", how="left"
+        )
+        merged["flag"] = 0
+        merged.loc[merged["prompt_name"].isna(), "flag"] = 1
+        return merged
 
 
 def write_data_into_pickle(data: pd.DataFrame, file_path: Path) -> None:

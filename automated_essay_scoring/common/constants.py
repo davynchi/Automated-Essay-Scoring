@@ -7,12 +7,14 @@ OUTPUT_DIR_FINETUNED = Path("./../pretrained_models")
 CACHED_DATA_PATH = Path("./../cached_data")
 OUTPUT_DIR_TRAIN = Path("./../trained_models")
 BEST_ENSEMBLE_WEIGHTS_PATH = Path("./../best_ensemble_weights")
+RAW_DATA_PATH = Path("./data/raw")
 
-DATA_PATH = Path("./learning-agency-lab-automated-essay-scoring-2")
 TRAIN_FILENAME = "train.csv"
 TEST_FILENAME = "test.csv"
-BEST_ENSEMBLE_WEIGHTS_FILENAME = "best_ensemble_weights.npy"
 PROMPTED_DATA_FILENAME = "persuade_2.0_human_scores_demo_id_github.csv"
+ALL_DATA_FILENAMES = [TRAIN_FILENAME, TEST_FILENAME, PROMPTED_DATA_FILENAME]
+
+BEST_ENSEMBLE_WEIGHTS_FILENAME = "best_ensemble_weights.npy"
 
 TRAIN_TEXT_PATH = CACHED_DATA_PATH / "train_text.txt"
 VAL_TEXT_PATH = CACHED_DATA_PATH / "val_text.txt"

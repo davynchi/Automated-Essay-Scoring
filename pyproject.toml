@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "mlops-project"
-version = "0.2.0"
+version = "0.3.0"
 description = "A project for my the course \"MLOps\" which is being taught at my master's degree. It is based on kaggle notebook of rating student's and schoolboy's essays."
 authors = ["davynci <davydov.mv@phystech.edu>"]
 readme = "README.md"

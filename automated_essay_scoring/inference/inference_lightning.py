@@ -2,6 +2,7 @@ import gc
 import logging
 from pathlib import Path
 
+import dvc.api
 import mlflow
 import numpy as np
 import pandas as pd
@@ -13,8 +14,8 @@ from torch.utils.data._utils.collate import default_collate
 from ..common.constants import (
     BEST_ENSEMBLE_WEIGHTS_FILENAME,
     BEST_ENSEMBLE_WEIGHTS_PATH,
-    DATA_PATH,
     PATH_TO_TOKENIZER,
+    RAW_DATA_PATH,
     SUBMISSION_FILENAME,
     SUBMISSION_PATH,
     TEST_FILENAME,
@@ -35,15 +36,21 @@ log = logging.getLogger(__name__)
 def load_test() -> pd.DataFrame:
     """Load and normalize the test dataset.
 
-    Reads the test CSV file from `DATA_PATH / TEST_FILENAME`, applies
+    Reads the test CSV file, applies
     text modifications in place.
 
     Returns:
         pd.DataFrame: Normalized test DataFrame.
     """
-    test = pd.read_csv(DATA_PATH / TEST_FILENAME)
-    modify_texts(test, "full_text")
-    return test[:128]
+    with dvc.api.open(
+        path=str(RAW_DATA_PATH / TEST_FILENAME),
+        repo=".",
+        rev="HEAD",
+        mode="r",
+    ) as fd:
+        test = pd.read_csv(fd)
+        modify_texts(test, "full_text")
+        return test[:128]
 
 
 def collate_infer(batch) -> dict[str, torch.Tensor]:

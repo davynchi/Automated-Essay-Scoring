@@ -5,11 +5,12 @@ import mlflow
 import mlflow.pytorch
 import mlflow.transformers
 import omegaconf
+from dvc.repo import Repo
 from hydra import compose, initialize
 from lightning.pytorch import seed_everything
 from omegaconf import OmegaConf
 
-from .common.constants import OUTPUT_DIR_TRAIN
+from .common.constants import ALL_DATA_FILENAMES, OUTPUT_DIR_TRAIN, RAW_DATA_PATH
 from .common.logging_config import configure_logging
 from .common.utils import register_new_utf_errors, set_torch_params
 from .finetune.finetune_model import finetune_model
@@ -81,6 +82,26 @@ def create_paths(cfg) -> None:
         model_cfg["path"] = str(dirpath)
 
 
+def ensure_data() -> None:
+    """Гарантирует наличие CSV-файлов локально, иначе качает из Cloud.ru."""
+    missing = [f for f in ALL_DATA_FILENAMES if not (RAW_DATA_PATH / f).is_file()]
+    if missing:
+        logging.info(
+            "Локальных файлов %s нет — качаю их из удалённого хранилища…",
+            ", ".join(missing),
+        )
+        Repo(".").pull(targets=[str(RAW_DATA_PATH)])
+
+        # проверяем, что после pull всё появилось
+        still_missing = [f for f in missing if not (RAW_DATA_PATH / f).is_file()]
+        if still_missing:
+            raise FileNotFoundError(
+                f"После pull отсутствуют файлы: {', '.join(still_missing)}"
+            )
+    else:
+        logging.info("Все исходные CSV уже есть локально.")
+
+
 def train_and_submit_model(
     path_to_finetuned_models: str | None = None,
     skip_train_phase: bool = False,
@@ -114,6 +135,9 @@ def train_and_submit_model(
         mlflow.log_dict(OmegaConf.to_container(cfg, resolve=True), "config.json")
         mlflow.set_tag("seed", cfg.seed)
         # print(f"Final Configurations: \n{OmegaConf.to_yaml(cfg)}")
+
+        mlflow.set_tag("stage", "load_data")
+        ensure_data()
 
         # ───────────────── data ────────────────── #
         mlflow.set_tag("stage", "data_preprocessing")
