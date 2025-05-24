@@ -6,6 +6,7 @@ submission.csv
 _check.ipynb
 mlruns
 _train
+logs
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

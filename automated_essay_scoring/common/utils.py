@@ -2,6 +2,7 @@ import codecs
 import os
 from pathlib import Path
 from typing import Tuple
+import GPUtil
 
 import numpy as np
 import pandas as pd
@@ -9,7 +10,6 @@ import torch
 from sklearn.metrics import cohen_kappa_score
 from text_unidecode import unidecode
 from transformers import DebertaTokenizer
-
 
 def set_torch_params() -> None:
     """Configure PyTorch and environment for stable training.
@@ -27,9 +27,9 @@ def set_torch_params() -> None:
     os.environ[
         "PYTORCH_CUDA_ALLOC_CONF"
     ] = "expandable_segments:True,max_split_size_mb:128"
+    os.environ["TOKENIZERS_PARALLELISM"] = "true"
     torch.backends.cuda.enable_flash_sdp(True)
     torch.backends.cudnn.deterministic = True
-    os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
 
 def replace_encoding_with_utf8(error: UnicodeError) -> Tuple[bytes, int]:

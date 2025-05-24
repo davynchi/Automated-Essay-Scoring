@@ -131,6 +131,17 @@ rerun от тех же файлов даёт идентичный CV.
 чекпоинты модели и все веса модели должны быть на сервере, из которого будет
 запускаться модель для инференса. Будет использоваться Triton.
 
+## Setup
+
+```bash
+conda create --name your_conda_env_name
+conda activate your_conda_env_name
+cd this_project
+conda install -c conda-forge poetry
+poetry config virtualenvs.create false --local
+poetry install
+```
+
 ## План реализации проекта
 
 - [x] Выбрать проект

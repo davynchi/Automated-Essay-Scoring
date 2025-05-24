@@ -90,7 +90,7 @@ def ensure_data() -> None:
             "Локальных файлов %s нет — качаю их из удалённого хранилища…",
             ", ".join(missing),
         )
-        Repo(".").pull(targets=[str(RAW_DATA_PATH)])
+        Repo(".").pull(targets=[str(RAW_DATA_PATH)], remote="storage-cloud")
 
         # проверяем, что после pull всё появилось
         still_missing = [f for f in missing if not (RAW_DATA_PATH / f).is_file()]

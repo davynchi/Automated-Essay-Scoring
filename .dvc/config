@@ -1,5 +1,7 @@
+[core]
+    remote = storage-cloud
 ['remote "storage-cloud"']
-    url = s3://automated-essay-scoring-storage
+    url = s3://bucket-automated-essay-scoring-storage
     endpointurl = https://s3.cloud.ru
     access_key_id = 22e51fb7-2370-421b-b4c4-30638cc06007:5e4f271af18f4f3c4ba4cb416ac14993
     secret_access_key = 5ffadef6372d480d011bbbf85e2d60bf
