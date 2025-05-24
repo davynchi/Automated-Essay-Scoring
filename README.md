@@ -140,6 +140,7 @@ cd this_project
 conda install -c conda-forge poetry
 poetry config virtualenvs.create false --local
 poetry install
+pre-commit install
 ```
 
 ## План реализации проекта

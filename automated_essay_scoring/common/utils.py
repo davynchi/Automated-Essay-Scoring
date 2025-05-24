@@ -2,7 +2,6 @@ import codecs
 import os
 from pathlib import Path
 from typing import Tuple
-import GPUtil
 
 import numpy as np
 import pandas as pd
@@ -10,6 +9,7 @@ import torch
 from sklearn.metrics import cohen_kappa_score
 from text_unidecode import unidecode
 from transformers import DebertaTokenizer
+
 
 def set_torch_params() -> None:
     """Configure PyTorch and environment for stable training.
