@@ -58,7 +58,7 @@ def load_config() -> "omegaconf.DictConfig":
     DictConfig
         Финальная конфигурация проекта.
     """
-    with initialize(version_base=None, config_path="conf"):
+    with initialize(version_base=None, config_path="./../configs"):
         cfg = compose(config_name="defaults")
     OmegaConf.set_struct(cfg, False)
     return cfg
@@ -103,7 +103,7 @@ def ensure_data() -> None:
 
 
 def train_and_submit_model(
-    path_to_finetuned_models: str | None = None,
+    skip_pretrain_phase: bool = False,
     skip_train_phase: bool = False,
     skip_best_ensemble: bool = False,
 ) -> None:
@@ -145,15 +145,15 @@ def train_and_submit_model(
 
         # ───────────────── LM fine-tune ─────────── #
         mlflow.set_tag("stage", "finetune_MLM")
-        if path_to_finetuned_models is None and not skip_train_phase:
+        if not skip_pretrain_phase and not skip_train_phase:
             finetune_model(cfg)
         else:
-            log.info(f"Using pre-trained model from {path_to_finetuned_models}")
+            log.info("Skipping pretraining phase")
 
         # ───────────────── main training ────────── #
         mlflow.set_tag("stage", "main_training")
         if not skip_train_phase:
-            train_model_lightning(cfg, path_to_finetuned_models)
+            train_model_lightning(cfg)
         else:
             log.info("Skipping training phase")
 

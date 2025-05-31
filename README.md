@@ -143,6 +143,15 @@ poetry install
 pre-commit install
 ```
 
+Ограничить набор GPU для тренировки можно через
+`export CUDA_VISIBLE_DEVICES=your_cuda_device_num`
+
+Для запуска в корне проекта выполнить:
+
+```bash
+python -m automated_essay_scoring.run
+```
+
 ## План реализации проекта
 
 - [x] Выбрать проект
@@ -167,10 +176,14 @@ pre-commit install
 - [x] Добавить аннотации типов
 - [x] Написать документацию
 - [x] Еще один рефакторинг -- пересмотр своего кода
-- [ ] Добавить dvc
-- [ ] Переписать README.md
-- [ ] Разделить код на train и infer
+- [x] Добавить dvc
+- [x] Добавить сохранение и подгрузку в формате onnx
+- [x] Переместить и переименовать папку conf
 - [ ] Добавить сохранение моделей через TensorRT (или TorchScript)
+- [ ] Переписать README.md
+- [ ] Поменять расположение best_ensemble_weights, Добавить удаление
+      oof_fold.pkl, поменять положение cached_data, submission.csv
+- [ ] Поменять иерархию содержимого папки configs
 - [ ] Добавить Triton для инференса
 - [ ] Добавить поддержку kaggle и kaggle/tmp
 - [ ] Запустить на всех данных

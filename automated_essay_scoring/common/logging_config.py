@@ -56,11 +56,11 @@ def configure_logging(level: str = "INFO", filename: str = "train.log") -> None:
     root.addHandler(file_handler)
 
     # Suppress verbose logs from common libraries
-    logging.getLogger("pytorch_lightning").setLevel(logging.WARNING)
-    logging.getLogger("lightning_fabric").setLevel(logging.WARNING)
-    logging.getLogger("transformers").setLevel(logging.WARNING)
-    logging.getLogger("fsspec").setLevel(logging.WARNING)
-    logging.getLogger("mlflow.tracking").setLevel(logging.WARNING)
+    # logging.getLogger("pytorch_lightning").setLevel(logging.WARNING)
+    # logging.getLogger("lightning_fabric").setLevel(logging.WARNING)
+    # logging.getLogger("transformers").setLevel(logging.WARNING)
+    # logging.getLogger("fsspec").setLevel(logging.WARNING)
+    # logging.getLogger("mlflow.tracking").setLevel(logging.WARNING)
 
-    # Silence MLflow “local version label” warnings
-    logging.getLogger("mlflow.utils.requirements_utils").setLevel(logging.ERROR)
+    # # Silence MLflow “local version label” warnings
+    # logging.getLogger("mlflow.utils.requirements_utils").setLevel(logging.ERROR)

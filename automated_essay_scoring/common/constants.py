@@ -3,10 +3,10 @@ from pathlib import Path
 
 # Fundamental defaults
 
-OUTPUT_DIR_FINETUNED = Path("./../pretrained_models")
-CACHED_DATA_PATH = Path("./../cached_data")
-OUTPUT_DIR_TRAIN = Path("./../trained_models")
-BEST_ENSEMBLE_WEIGHTS_PATH = Path("./../best_ensemble_weights")
+OUTPUT_DIR_FINETUNED = Path("./pretrained_models")
+CACHED_DATA_PATH = Path("./cached_data")
+OUTPUT_DIR_TRAIN = Path("./trained_models")
+BEST_ENSEMBLE_WEIGHTS_PATH = Path("./best_ensemble_weights")
 RAW_DATA_PATH = Path("./data/raw")
 
 TRAIN_FILENAME = "train.csv"

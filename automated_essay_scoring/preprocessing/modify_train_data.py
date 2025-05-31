@@ -29,7 +29,9 @@ def read_train_dataset() -> pd.DataFrame:
         rev="HEAD",
         mode="r",
     ) as fd:
-        train = pd.read_csv(fd)
+        train = pd.read_csv(
+            fd, engine="python", encoding="utf-8", encoding_errors="replace"
+        )
         train.columns = ["id", "text", "score"]
         return train
 

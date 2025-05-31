@@ -2,16 +2,19 @@ import gc
 from glob import glob
 from pathlib import Path
 
+import mlflow
 import pandas as pd
 import pytorch_lightning as L
 import torch
+import torch.nn as nn
+import torch.onnx
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import MLFlowLogger
 from torch.utils.data import DataLoader
 from torch.utils.data._utils.collate import default_collate
 from transformers import DebertaTokenizer
 
-from ..common.constants import PATH_TO_TOKENIZER, TRAIN_PICKLE_PATH
+from ..common.constants import OUTPUT_DIR_FINETUNED, PATH_TO_TOKENIZER, TRAIN_PICKLE_PATH
 from ..common.utils import create_tokenizer, remove_files
 from ..dataset.data_modules import EssayDataModule
 from ..dataset.dataset import collate
@@ -148,6 +151,12 @@ def free_trainer(trainer: L.Trainer, *objs) -> None:
     gc.collect()
 
 
+def get_checkpoint_name(model_idx, fold, stage_idx, add_ckpt_postfix=False):
+    return f"model{model_idx}_fold{fold}_stage{stage_idx}" + (
+        ".ckpt" if add_ckpt_postfix else ""
+    )
+
+
 def train_one_stage(
     cfg,
     cfg_unit,
@@ -155,9 +164,10 @@ def train_one_stage(
     fold: int,
     train_df: pd.DataFrame,
     eval_on_prompted: bool,
-    stage_tag: str,
+    stage_idx: int,
     init_ckpt: str | None = None,
     path_to_finetuned_models: str | None = None,
+    prepare_to_infer: bool = False,
 ) -> None:
     """Train a single fold for one stage (stage-1 or stage-2).
 
@@ -178,7 +188,7 @@ def train_one_stage(
     dm.setup()
 
     # Callbacks and Logger
-    run_tag = f"model{model_idx}_fold{fold}_{stage_tag}"
+    run_tag = get_checkpoint_name(model_idx, fold, stage_idx)
     ckpt_callback = ModelCheckpoint(
         dirpath=cfg_unit.path,
         filename=run_tag,
@@ -239,11 +249,52 @@ def train_one_stage(
     oof_df["pred"] = preds
     oof_df.to_pickle(Path(cfg_unit.path) / f"oof_fold{fold}.pkl")
 
+    # ───────── ONNX export ───────── #
+    if prepare_to_infer:
+        # — упрощённый ONNX-экспорт через PL.to_onnx() —
+        batch = next(iter(pred_dl))  # dict: input_ids, attention_mask
+        # переносим на устройство
+        batch = {k: v.to(model.device) for k, v in batch.items()}
+        input_ids = batch["input_ids"]  # shape e.g. (8, 512)
+        attention_mask = batch["attention_mask"]  # shape e.g. (8, 512)
+
+        # сохраняем ONNX
+        onnx_path = Path(cfg_unit.path) / f"{run_tag}.onnx"
+
+        class EssayONNXWrapper(nn.Module):
+            def __init__(self, pl_model):
+                super().__init__()
+                self.pl_model = pl_model
+
+            def forward(self, input_ids, attention_mask):
+                return self.pl_model(
+                    {"input_ids": input_ids, "attention_mask": attention_mask}
+                )
+
+        wrapper = EssayONNXWrapper(model).eval()
+
+        torch.onnx.export(
+            wrapper,
+            (input_ids, attention_mask),
+            f=onnx_path.as_posix(),
+            input_names=["input_ids", "attention_mask"],
+            output_names=["logits"],
+            dynamic_axes={
+                "input_ids": {0: "batch", 1: "seq"},
+                "attention_mask": {0: "batch", 1: "seq"},
+                "logits": {0: "batch"},
+            },
+            opset_version=17,
+        )
+
+        # логировать файл в MLflow
+        mlflow.log_artifact(str(onnx_path), artifact_path="onnx_models")
+
     # Cleanup
     free_trainer(trainer, model, pred_dl, preds, oof_df)
 
 
-def train_model_lightning(cfg, path_to_finetuned_models: str | None = None) -> None:
+def train_model_lightning(cfg) -> None:
     """Run full training pipeline over all ensemble members and folds.
 
     For each model index and fold:
@@ -267,13 +318,14 @@ def train_model_lightning(cfg, path_to_finetuned_models: str | None = None) -> N
                 fold,
                 df_s1,
                 eval_on_prompted=False,
-                stage_tag="stage1",
+                stage_idx=1,
                 init_ckpt=None,
-                path_to_finetuned_models=path_to_finetuned_models,
+                path_to_finetuned_models=OUTPUT_DIR_FINETUNED,
+                prepare_to_infer=False,
             )
 
             # Locate best stage-1 checkpoint
-            pattern = f"model{model_idx}_fold{fold}_stage1.ckpt"
+            pattern = get_checkpoint_name(model_idx, fold, 1, add_ckpt_postfix=True)
             s1_ckpt = max(
                 Path(cfg_unit.path).glob(pattern),
                 key=lambda p: p.stat().st_mtime,
@@ -289,10 +341,11 @@ def train_model_lightning(cfg, path_to_finetuned_models: str | None = None) -> N
                 fold,
                 df_s2,
                 eval_on_prompted=True,
-                stage_tag="stage2",
+                stage_idx=2,
                 init_ckpt=s1_ckpt,
-                path_to_finetuned_models=path_to_finetuned_models,
+                path_to_finetuned_models=OUTPUT_DIR_FINETUNED,
+                prepare_to_infer=True,
             )
 
-            # Purge stage-1 ckpts
-            remove_files(Path(cfg_unit.path), pattern="*_stage1.ckpt")
+            # Purge stage ckpts
+            remove_files(Path(cfg_unit.path), pattern="*.ckpt")
