@@ -34,3 +34,5 @@ MODEL_UNIT_CONFIG_NAME = "config.pth"
 # File naming convention
 CHECKPOINT_POSTFIX = "_chk"
 BEST_CHECKPOINT_POSTFIX = "_final"
+
+STAGES_NUM = 2

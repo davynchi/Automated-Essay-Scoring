@@ -11,6 +11,10 @@ from text_unidecode import unidecode
 from transformers import DebertaTokenizer
 
 
+def get_checkpoint_name(model_idx, fold, stage_idx):
+    return f"model{model_idx}_fold{fold}_stage{stage_idx}"
+
+
 def set_torch_params() -> None:
     """Configure PyTorch and environment for stable training.
 

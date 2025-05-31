@@ -33,6 +33,7 @@ gputil = "^1.4.0"
 onnxruntime = "^1.22.0"
 onnx = "^1.18.0"
 onnxruntime-gpu = "^1.22.0"
+pycuda = "^2025.1"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^4.0.0"

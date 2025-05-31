@@ -106,6 +106,7 @@ def train_and_submit_model(
     skip_pretrain_phase: bool = False,
     skip_train_phase: bool = False,
     skip_best_ensemble: bool = False,
+    skip_converting_to_tensorrt: bool = False,
 ) -> None:
     """
     Полный конвейер: подготовка данных → (опц.) дообучение MLM →
@@ -153,7 +154,7 @@ def train_and_submit_model(
         # ───────────────── main training ────────── #
         mlflow.set_tag("stage", "main_training")
         if not skip_train_phase:
-            train_model_lightning(cfg)
+            train_model_lightning(cfg, skip_converting_to_tensorrt)
         else:
             log.info("Skipping training phase")
 
