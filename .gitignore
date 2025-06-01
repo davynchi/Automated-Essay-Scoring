@@ -8,6 +8,7 @@ mlruns
 _train
 logs
 best_ensemble_weights
+triton_repo*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

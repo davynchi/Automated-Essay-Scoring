@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "automated_essay_scoring"
-version = "0.3.0"
+version = "0.4.0"
 description = "A pipeline for learning and an inference model for automatic grading of written essays."
 authors = ["davynci <davydov.mv@phystech.edu>"]
 readme = "README.md"
@@ -34,6 +34,8 @@ onnxruntime = "^1.22.0"
 onnx = "^1.18.0"
 onnxruntime-gpu = "^1.22.0"
 pycuda = "^2025.1"
+tritonclient = {extras = ["all"], version = "^2.57.0"}
+tensorrt = "10.9.0.34"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^4.0.0"

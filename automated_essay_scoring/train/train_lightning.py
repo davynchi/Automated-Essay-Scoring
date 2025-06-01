@@ -15,14 +15,14 @@ from transformers import DebertaTokenizer
 from ..common.constants import (
     OUTPUT_DIR_FINETUNED,
     PATH_TO_TOKENIZER,
-    STAGES_NUM,
     TRAIN_PICKLE_PATH,
+    TRITON_MODELS_PATH,
 )
 from ..common.utils import create_tokenizer, get_checkpoint_name, remove_files
 from ..dataset.data_modules import EssayDataModule
 from ..dataset.dataset import collate
 from ..model.lightning_modules import EssayScoringPL
-from .convertions import convert_to_tensorrt, export_to_onnx
+from .prepare_to_infer import add_model_to_triton, convert_to_tensorrt, export_to_onnx
 
 
 def tokenize_text(
@@ -247,19 +247,27 @@ def train_one_stage(
     oof_df.to_pickle(Path(cfg_unit.path) / f"oof_fold{fold}.pkl")
 
     if prepare_to_infer:
-        export_to_onnx(cfg_unit, model, pred_dl, onnx_name=run_tag)
+        onnx_path = export_to_onnx(cfg_unit, model, pred_dl, onnx_name=run_tag)
 
-        path_to_onnx = (
-            Path(cfg_unit.path)
-            / get_checkpoint_name(model_idx, fold, stage_idx=STAGES_NUM)
-        ).with_suffix(".onnx")
-        convert_to_tensorrt(
-            path_to_onnx,
-            batch_max=cfg.base.infer_batch_size,
+        if not skip_converting_to_tensorrt:
+            plan_path = convert_to_tensorrt(
+                onnx_path,
+                batch_max=cfg.base.infer_batch_size,
+                seq_len=cfg_unit.max_len,
+                fp16=True,
+                int8=False,
+                workspace_mb=4096,
+            )
+            artefact_path = Path(plan_path)
+        else:
+            artefact_path = onnx_path
+
+        add_model_to_triton(
+            artefact_path,
             seq_len=cfg_unit.max_len,
-            fp16=True,
-            int8=False,
-            workspace_mb=4096,
+            mbatch=cfg.base.infer_batch_size,
+            model_idx=model_idx,
+            fold=fold,
         )
 
     # Cleanup
@@ -306,6 +314,7 @@ def train_model_lightning(cfg, skip_converting_to_tensorrt) -> None:
             # Stage-2
             df_s2 = load_pickle_data(cfg_unit, load_from_existed_pickle=True)
             tokenize_text(df_s2)
+            TRITON_MODELS_PATH.mkdir(parents=True, exist_ok=True)
             train_one_stage(
                 cfg,
                 cfg_unit,

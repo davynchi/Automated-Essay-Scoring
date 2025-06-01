@@ -64,3 +64,19 @@ def configure_logging(level: str = "INFO", filename: str = "train.log") -> None:
 
     # # Silence MLflow “local version label” warnings
     # logging.getLogger("mlflow.utils.requirements_utils").setLevel(logging.ERROR)
+
+
+def start_logging() -> logging.Logger:
+    """
+    Настраивает корневой логгер через ``configure_logging`` и
+    возвращает объект‑логгер текущего модуля.
+
+    Возврат
+    -------
+    logging.Logger
+        Конфигурированный логгер, которым пользуется run‑pipeline.
+    """
+    configure_logging(level="INFO")
+    log = logging.getLogger(__name__)
+    log.info("🚀 Starting …")
+    return log

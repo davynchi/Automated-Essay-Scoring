@@ -1,5 +1,6 @@
 import json
 import logging
+import shutil
 import sys
 import time
 from pathlib import Path
@@ -9,6 +10,8 @@ import onnx
 import tensorrt as trt
 import torch
 import torch.nn as nn
+
+from ..common.constants import TRITON_MODELS_PATH
 
 
 LOGGER = logging.getLogger("onnx2trt")
@@ -56,6 +59,7 @@ def export_to_onnx(cfg_unit, model, pred_dl, onnx_name):
 
     # логировать файл в MLflow
     mlflow.log_artifact(str(onnx_path), artifact_path="onnx_models")
+    return onnx_path
 
 
 def convert_to_tensorrt(
@@ -213,3 +217,60 @@ def get_onnx_input_dimensions(path_to_onnx):
                 # dim.dim_param is the symbolic name, e.g. "batch_size" or "sequence"
                 shape_dims.append(dim.dim_param if dim.dim_param else "dynamic")
         LOGGER.info(f"Input {name!r} has shape: {shape_dims}")
+
+
+def add_model_to_triton(src: Path, seq_len: int, mbatch: int, model_idx: int, fold: int):
+    """
+    src = either *.plan or *.onnx
+    """
+    stem = src.stem
+    mdir = TRITON_MODELS_PATH / stem
+    vdir = mdir / "1"
+    vdir.mkdir(parents=True, exist_ok=True)
+
+    if src.suffix == ".plan":
+        backend = "tensorrt_plan"
+        shutil.copy2(src, vdir / "model.plan")
+    else:
+        backend = "onnxruntime_onnx"
+        shutil.copy2(src, vdir / "model.onnx")
+
+    triton_cfg = f"""
+name: {stem!r}
+platform: {backend!r}
+max_batch_size: {mbatch}
+input [
+  {{
+    name: "input_ids"
+    data_type: TYPE_INT64
+    dims: [ {seq_len} ]
+   }},
+  {{
+    name: "attention_mask"
+    data_type: TYPE_INT64
+    dims: [ {seq_len} ]
+  }}
+]
+output [
+  {{
+    name: "logits"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+  }}
+]
+instance_group [
+    {{
+        kind: KIND_GPU
+    }}
+]
+parameters {{
+  key: "MODEL_NAME"
+  value {{ string_value: {model_idx!r} }}
+}}
+parameters {{
+  key: "FOLD_IDX"
+  value {{ string_value: {fold!r} }}
+}}
+"""
+    (mdir / "config.pbtxt").write_text(triton_cfg.lstrip())
+    return stem

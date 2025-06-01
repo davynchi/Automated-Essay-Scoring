@@ -1,13 +1,13 @@
 from pathlib import Path
 
 
-# Fundamental defaults
-
 OUTPUT_DIR_FINETUNED = Path("./pretrained_models")
 CACHED_DATA_PATH = Path("./cached_data")
 OUTPUT_DIR_TRAIN = Path("./trained_models")
 BEST_ENSEMBLE_WEIGHTS_PATH = Path("./best_ensemble_weights")
 RAW_DATA_PATH = Path("./data/raw")
+TRITON_MODELS_PATH = Path("./triton_repo")
+HYDRA_CONFIG_PATH = Path("./../../configs")
 
 TRAIN_FILENAME = "train.csv"
 TEST_FILENAME = "test.csv"
@@ -30,6 +30,7 @@ NAMES_OF_MODELS = {
 PATH_TO_TOKENIZER = "microsoft/deberta-base"
 PICKLE_NAME = "oof_df.pkl"
 MODEL_UNIT_CONFIG_NAME = "config.pth"
+HYDRA_CONFIG_NAME = "defaults"
 
 # File naming convention
 CHECKPOINT_POSTFIX = "_chk"
