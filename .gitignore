@@ -9,6 +9,7 @@ _train
 logs
 best_ensemble_weights
 triton_repo*
+data/submission
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

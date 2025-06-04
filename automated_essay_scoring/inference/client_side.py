@@ -16,7 +16,6 @@ from ..common.constants import (
     BEST_ENSEMBLE_WEIGHTS_PATH,
     PATH_TO_TOKENIZER,
     RAW_DATA_PATH,
-    SUBMISSION_FILENAME,
     SUBMISSION_PATH,
     TEST_FILENAME,
 )
@@ -117,10 +116,9 @@ def write_submission(test_df: pd.DataFrame) -> None:
     Write test_df[['essay_id','score']] → CSV + MLflow artifact.
     """
     SUBMISSION_PATH.mkdir(parents=True, exist_ok=True)
-    output_file = SUBMISSION_PATH / SUBMISSION_FILENAME
-    test_df[["essay_id", "score"]].to_csv(output_file, index=False)
-    log.info(f"Saved submission to {output_file}")
-    mlflow.log_artifact(str(output_file))
+    test_df[["essay_id", "score"]].to_csv(SUBMISSION_PATH, index=False)
+    log.info(f"Saved submission to {SUBMISSION_PATH}")
+    mlflow.log_artifact(str(SUBMISSION_PATH))
 
 
 def add_pred_and_score_columns(

@@ -20,8 +20,7 @@ TRAIN_TEXT_PATH = CACHED_DATA_PATH / "train_text.txt"
 VAL_TEXT_PATH = CACHED_DATA_PATH / "val_text.txt"
 TRAIN_PICKLE_PATH = CACHED_DATA_PATH / "train.pkl"
 
-SUBMISSION_PATH = Path("./")
-SUBMISSION_FILENAME = "submission.csv"
+SUBMISSION_PATH = Path("./data/submission/submission.csv")
 
 NAMES_OF_MODELS = {
     "base": "microsoft/deberta-v3-base",

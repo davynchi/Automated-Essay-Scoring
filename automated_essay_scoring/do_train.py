@@ -51,6 +51,7 @@ def ensure_data() -> None:
 
 
 def train_model_full_pipeline(
+    skip_preprocessing: bool = False,
     skip_pretrain_phase: bool = False,
     skip_train_phase: bool = False,
     skip_best_ensemble: bool = False,
@@ -90,7 +91,8 @@ def train_model_full_pipeline(
 
         # ───────────────── data ────────────────── #
         mlflow.set_tag("stage", "data_preprocessing")
-        modify_train_data(cfg)
+        if not skip_preprocessing:
+            modify_train_data(cfg)
 
         # ───────────────── LM fine-tune ─────────── #
         mlflow.set_tag("stage", "finetune_MLM")
