@@ -12,7 +12,6 @@ from torch.utils.data._utils.collate import default_collate
 from tqdm import tqdm
 
 from ..common.constants import (
-    BEST_ENSEMBLE_WEIGHTS_FILENAME,
     BEST_ENSEMBLE_WEIGHTS_PATH,
     PATH_TO_TOKENIZER,
     RAW_DATA_PATH,
@@ -128,7 +127,7 @@ def add_pred_and_score_columns(
     Exactly the same as inference_lightning:
     Load best_ensemble_weights.npy, build pred_i columns, blend → final score.
     """
-    best_weights = np.load(BEST_ENSEMBLE_WEIGHTS_PATH / BEST_ENSEMBLE_WEIGHTS_FILENAME)
+    best_weights = np.load(BEST_ENSEMBLE_WEIGHTS_PATH)
     # Create pred_i columns
     test_df[[f"pred_{i}" for i in range(len(predictions_list))]] = np.array(
         predictions_list

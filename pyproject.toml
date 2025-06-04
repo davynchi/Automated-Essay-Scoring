@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "automated_essay_scoring"
-version = "0.4.1"
+version = "0.4.2"
 description = "A pipeline for learning and an inference model for automatic grading of written essays."
 authors = ["davynci <davydov.mv@phystech.edu>"]
 readme = "README.md"

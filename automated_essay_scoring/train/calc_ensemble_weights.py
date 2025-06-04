@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 
-from ..common.constants import BEST_ENSEMBLE_WEIGHTS_FILENAME, BEST_ENSEMBLE_WEIGHTS_PATH
+from ..common.constants import BEST_ENSEMBLE_WEIGHTS_PATH
 from ..common.utils import get_score
 
 
@@ -125,7 +125,7 @@ def calc_best_weights_for_ensemble(cfg) -> np.ndarray:
       5. Вычисляет и логирует скор финального смешанного предсказания
 
     В результате сохраняется файл
-    `<BEST_ENSEMBLE_WEIGHTS_PATH>/best_ensemble_weights.npy`.
+    `<BEST_ENSEMBLE_WEIGHTS_DIR>/best_ensemble_weights.npy`.
 
     Args:
         cfg: Конфигурация, полученная от Hydra.
@@ -188,7 +188,7 @@ def calc_best_weights_for_ensemble(cfg) -> np.ndarray:
     mlflow.log_metric("blending_score_unprompted_texts", blend_unprompt)
 
     # Сохранение весов на диск
-    BEST_ENSEMBLE_WEIGHTS_PATH.mkdir(parents=True, exist_ok=True)
-    np.save(BEST_ENSEMBLE_WEIGHTS_PATH / BEST_ENSEMBLE_WEIGHTS_FILENAME, best_weights)
+    BEST_ENSEMBLE_WEIGHTS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    np.save(BEST_ENSEMBLE_WEIGHTS_PATH, best_weights)
 
     return best_weights

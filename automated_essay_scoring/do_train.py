@@ -15,7 +15,7 @@ from .common.utils import register_new_utf_errors, set_torch_params
 from .finetune.finetune_model import finetune_model
 from .preprocessing.modify_train_data import modify_train_data
 from .train.calc_ensemble_weights import calc_best_weights_for_ensemble
-from .train.train_lightning import train_model_lightning
+from .train.train_lightning import delete_cached_model_data, train_model_lightning
 
 
 def start_mlflow() -> None:
@@ -54,8 +54,9 @@ def train_model_full_pipeline(
     skip_preprocessing: bool = False,
     skip_pretrain_phase: bool = False,
     skip_train_phase: bool = False,
-    skip_best_ensemble: bool = False,
     skip_converting_to_tensorrt: bool = False,
+    skip_best_ensemble: bool = False,
+    delete_model_data_after_training: bool = False,
 ) -> None:
     """
     Полный конвейер: подготовка данных → (опц.) дообучение MLM →
@@ -114,6 +115,10 @@ def train_model_full_pipeline(
             calc_best_weights_for_ensemble(cfg)
         else:
             log.info("Skipping ensemble weights calculation")
+
+        if delete_model_data_after_training:
+            delete_cached_model_data()
+            log.info("Deleted model data, only inference data is saved")
 
         # ───────────────── inference / submit ───── #
         # mlflow.set_tag("stage", "inference")

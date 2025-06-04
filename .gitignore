@@ -10,6 +10,7 @@ logs
 best_ensemble_weights
 triton_repo*
 data/submission
+data/models
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

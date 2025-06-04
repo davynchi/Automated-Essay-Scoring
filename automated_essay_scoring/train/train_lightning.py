@@ -1,4 +1,5 @@
 import gc
+import shutil
 from glob import glob
 from pathlib import Path
 
@@ -13,7 +14,9 @@ from torch.utils.data._utils.collate import default_collate
 from transformers import DebertaTokenizer
 
 from ..common.constants import (
+    CACHED_DATA_PATH,
     OUTPUT_DIR_FINETUNED,
+    OUTPUT_DIR_TRAIN,
     PATH_TO_TOKENIZER,
     TRAIN_PICKLE_PATH,
     TRITON_MODELS_PATH,
@@ -153,6 +156,11 @@ def free_trainer(trainer: L.Trainer, *objs) -> None:
     torch.cuda.empty_cache()
     torch.cuda.ipc_collect()
     gc.collect()
+
+
+def delete_cached_model_data():
+    for path in [OUTPUT_DIR_FINETUNED, CACHED_DATA_PATH, OUTPUT_DIR_TRAIN]:
+        shutil.rmtree(path)
 
 
 def train_one_stage(
