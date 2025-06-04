@@ -2,7 +2,7 @@ from pathlib import Path
 
 
 OUTPUT_DIR_FINETUNED = Path("./data/models/pretrained_models")
-CACHED_DATA_PATH = Path("./data/cached_data")
+CACHED_DATA_DIR = Path("./data/cached_data")
 OUTPUT_DIR_TRAIN = Path("./data/models/trained_models")
 RAW_DATA_PATH = Path("./data/raw")
 TRITON_MODELS_PATH = Path("./triton_repo")
@@ -10,12 +10,15 @@ HYDRA_CONFIG_PATH = Path("./../../configs")
 
 TRAIN_FILENAME = "train.csv"
 TEST_FILENAME = "test.csv"
+TEST_SCORE_FILENAME = "test_score.csv"
 PROMPTED_DATA_FILENAME = "persuade_2.0_human_scores_demo_id_github.csv"
-ALL_DATA_FILENAMES = [TRAIN_FILENAME, TEST_FILENAME, PROMPTED_DATA_FILENAME]
 
-TRAIN_TEXT_PATH = CACHED_DATA_PATH / "train_text.txt"
-VAL_TEXT_PATH = CACHED_DATA_PATH / "val_text.txt"
-TRAIN_PICKLE_PATH = CACHED_DATA_PATH / "train.pkl"
+TRAIN_DATA_FILENAMES = [TRAIN_FILENAME, PROMPTED_DATA_FILENAME]
+TEST_DATA_FILENAMES = [TEST_FILENAME, TEST_SCORE_FILENAME]
+
+TRAIN_TEXT_PATH = CACHED_DATA_DIR / "train_text.txt"
+VAL_TEXT_PATH = CACHED_DATA_DIR / "val_text.txt"
+TRAIN_PICKLE_PATH = CACHED_DATA_DIR / "train.pkl"
 
 BEST_ENSEMBLE_WEIGHTS_DIR = Path("./data/models/best_ensemble_weights")
 BEST_ENSEMBLE_WEIGHTS_FILENAME = "best_ensemble_weights.npy"

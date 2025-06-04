@@ -1,14 +1,20 @@
 import codecs
+import io
+import logging
 import os
 from pathlib import Path
 from typing import Tuple
 
+import dvc.api
 import numpy as np
 import pandas as pd
 import torch
 from sklearn.metrics import cohen_kappa_score
 from text_unidecode import unidecode
 from transformers import DebertaTokenizer
+
+
+log = logging.getLogger(__name__)
 
 
 def get_checkpoint_name(model_idx, fold, stage_idx):
@@ -178,3 +184,16 @@ def create_tokenizer(path: str) -> DebertaTokenizer:
     tokenizer = DebertaTokenizer.from_pretrained(path)
     tokenizer.add_special_tokens({"additional_special_tokens": ["[BR]"]})
     return tokenizer
+
+
+def read_dataset(path: Path | str):
+    with dvc.api.open(
+        path=str(path),
+        repo=".",
+        rev="HEAD",
+        mode="rb",
+    ) as raw_fd:
+        text_fd = io.TextIOWrapper(raw_fd, encoding="utf-8", errors="replace")
+        df = pd.read_csv(text_fd, engine="python")
+    log.info(f"File {path} is loaded")
+    return df

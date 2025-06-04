@@ -14,7 +14,7 @@ from torch.utils.data._utils.collate import default_collate
 from transformers import DebertaTokenizer
 
 from ..common.constants import (
-    CACHED_DATA_PATH,
+    CACHED_DATA_DIR,
     OUTPUT_DIR_FINETUNED,
     OUTPUT_DIR_TRAIN,
     PATH_TO_TOKENIZER,
@@ -159,8 +159,9 @@ def free_trainer(trainer: L.Trainer, *objs) -> None:
 
 
 def delete_cached_model_data():
-    for path in [OUTPUT_DIR_FINETUNED, CACHED_DATA_PATH, OUTPUT_DIR_TRAIN]:
-        shutil.rmtree(path)
+    for path in [OUTPUT_DIR_FINETUNED, CACHED_DATA_DIR, OUTPUT_DIR_TRAIN]:
+        if path.exists() and path.is_dir():
+            shutil.rmtree(path)
 
 
 def train_one_stage(

@@ -1,12 +1,11 @@
-import io
 import logging
 
-import dvc.api
 import mlflow
 import numpy as np
 import pandas as pd
 import torch
 import tritonclient.grpc as grpcclient
+from sklearn.metrics import cohen_kappa_score
 from torch.utils.data import DataLoader
 from torch.utils.data._utils.collate import default_collate
 from tqdm import tqdm
@@ -17,32 +16,13 @@ from ..common.constants import (
     RAW_DATA_PATH,
     SUBMISSION_PATH,
     TEST_FILENAME,
+    TEST_SCORE_FILENAME,
 )
-from ..common.utils import create_tokenizer, get_essay_score, modify_texts
+from ..common.utils import create_tokenizer, get_essay_score, modify_texts, read_dataset
 from ..dataset.dataset import LALDataset, collate
 
 
 log = logging.getLogger(__name__)
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s  %(levelname)-8s  %(message)s"
-)
-
-
-def load_test() -> pd.DataFrame:
-    """
-    Exactly the same logic as in inference_lightning.py:
-    Load test.csv via DVC, fix encodings, drop after 256 rows (for quick dev).
-    """
-    with dvc.api.open(
-        path=str(RAW_DATA_PATH / TEST_FILENAME),
-        repo=".",
-        rev="HEAD",
-        mode="rb",
-    ) as raw_fd:
-        text_fd = io.TextIOWrapper(raw_fd, encoding="utf-8", errors="replace")
-        df = pd.read_csv(text_fd, engine="python")
-    modify_texts(df, "full_text")
-    return df[:256]
 
 
 def triton_infer_batch(
@@ -76,14 +56,6 @@ def triton_infer_batch(
     return logits.squeeze()
 
 
-# def collate_infer(batch) -> dict[str, torch.Tensor]:
-#     """
-#     Exactly the same collate as before: default_collate → trim to max actual length.
-#     """
-#     raw_inputs = default_collate(batch)  # raw_inputs is a dict of torch.Tensors
-#     return collate(raw_inputs)  # output is a dict { "input_ids": Tensor, "attention_mask": Tensor }
-
-
 def collate_infer(batch, seq_len: int) -> dict[str, torch.Tensor]:
     """
     Collate a batch and then force‐pad/truncate everything to exactly `seq_len`.
@@ -114,7 +86,7 @@ def write_submission(test_df: pd.DataFrame) -> None:
     Exactly the same as inference_lightning:
     Write test_df[['essay_id','score']] → CSV + MLflow artifact.
     """
-    SUBMISSION_PATH.mkdir(parents=True, exist_ok=True)
+    SUBMISSION_PATH.parent.mkdir(parents=True, exist_ok=True)
     test_df[["essay_id", "score"]].to_csv(SUBMISSION_PATH, index=False)
     log.info(f"Saved submission to {SUBMISSION_PATH}")
     mlflow.log_artifact(str(SUBMISSION_PATH))
@@ -139,6 +111,45 @@ def add_pred_and_score_columns(
     test_df["score"] = get_essay_score(test_df["pred"].values) + 1
 
 
+def get_score_on_test_data(test_df: pd.DataFrame) -> float:
+    """
+    Объединяет переданный test_df (essay_id, score_pred) с истинными оценками
+    из RAW_DATA_PATH/"test"/TEST_SCORE_FILENAME, вычисляет Quadratic Weighted Kappa
+    через get_score и логирует результат.
+
+    Args:
+        test_df (pd.DataFrame): DataFrame с колонками ['essay_id', 'score']
+                                где 'score' — это предсказание модели.
+
+    Returns:
+        float: Значение QWK (квадратично-взвешенный каппа).
+    """
+    true_df: pd.DataFrame = read_dataset(RAW_DATA_PATH / "test" / TEST_SCORE_FILENAME)[
+        :256
+    ]
+    true_df.rename(columns={"score": "score_true"}, inplace=True)
+
+    pred_df = test_df.rename(columns={"score": "score_pred"})
+
+    merged_df = pd.merge(
+        true_df, pred_df, on="essay_id", how="inner", validate="one_to_one"
+    )
+
+    # Проверим, не потерялось ли что-либо при merge
+    if merged_df.shape[0] != test_df.shape[0]:
+        missing_ids = set(test_df["essay_id"]) - set(merged_df["essay_id"])
+        logging.warning("При объединении пропущены строки с essay_id: %s", missing_ids)
+
+    y_trues: np.ndarray = merged_df["score_true"].to_numpy(dtype=int)
+    y_preds: np.ndarray = merged_df["score_pred"].to_numpy(dtype=float)
+    final_score: float = cohen_kappa_score(y_trues, y_preds, weights="quadratic")
+
+    logging.info(f"The final score is {final_score:.6f}")
+    mlflow.log_metric("final_score", final_score)
+
+    return final_score
+
+
 def make_submission_triton(cfg, triton_url: str = "localhost:8001") -> None:
     """
     Mirror make_submission_lightning, but call Triton instead of ONNXSession:
@@ -153,7 +164,8 @@ def make_submission_triton(cfg, triton_url: str = "localhost:8001") -> None:
     5) write_submission()
     """
     # Step 1: data + tokenizer
-    test_df = load_test()
+    test_df = read_dataset(RAW_DATA_PATH / "test" / TEST_FILENAME)[:256]
+    modify_texts(test_df, "full_text")
     tokenizer = create_tokenizer(path=PATH_TO_TOKENIZER)
 
     # Triton gRPC client
@@ -204,3 +216,4 @@ def make_submission_triton(cfg, triton_url: str = "localhost:8001") -> None:
     # Step 4: Blend & write
     add_pred_and_score_columns(test_df, all_model_preds)
     write_submission(test_df)
+    get_score_on_test_data(test_df)

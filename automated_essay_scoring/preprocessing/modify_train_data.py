@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import dvc.api
 import pandas as pd
 from iterstrat.ml_stratifiers import MultilabelStratifiedKFold
 
@@ -12,28 +11,7 @@ from ..common.constants import (
     TRAIN_TEXT_PATH,
     VAL_TEXT_PATH,
 )
-from ..common.utils import modify_texts
-
-
-def read_train_dataset() -> pd.DataFrame:
-    """Read and rename columns of the original training CSV.
-
-    Reads train datframe, renames columns to `id`, `text`, `score`.
-
-    Returns:
-        pd.DataFrame: DataFrame with columns `id`, `text`, `score`.
-    """
-    with dvc.api.open(
-        path=str(RAW_DATA_PATH / TRAIN_FILENAME),
-        repo=".",
-        rev="HEAD",
-        mode="r",
-    ) as fd:
-        train = pd.read_csv(
-            fd, engine="python", encoding="utf-8", encoding_errors="replace"
-        )
-        train.columns = ["id", "text", "score"]
-        return train
+from ..common.utils import modify_texts, read_dataset
 
 
 def divide_train_into_folds(train: pd.DataFrame, n_splits: int) -> None:
@@ -72,19 +50,14 @@ def set_flag_using_prompted_data(train: pd.DataFrame) -> pd.DataFrame:
     Returns:
         pd.DataFrame: Merged DataFrame including `flag` column.
     """
-    with dvc.api.open(
-        path=str(RAW_DATA_PATH / PROMPTED_DATA_FILENAME),
-        repo=".",
-        rev="HEAD",
-        mode="r",
-    ) as fd:
-        prompted_data = pd.read_csv(fd)
-        merged = pd.merge(
-            train, prompted_data, left_on="text", right_on="full_text", how="left"
-        )
-        merged["flag"] = 0
-        merged.loc[merged["prompt_name"].isna(), "flag"] = 1
-        return merged
+    prompted_data = read_dataset(RAW_DATA_PATH / "train" / PROMPTED_DATA_FILENAME)
+
+    merged = pd.merge(
+        train, prompted_data, left_on="text", right_on="full_text", how="left"
+    )
+    merged["flag"] = 0
+    merged.loc[merged["prompt_name"].isna(), "flag"] = 1
+    return merged
 
 
 def write_data_into_pickle(data: pd.DataFrame, file_path: Path) -> None:
@@ -156,7 +129,8 @@ def modify_train_data(cfg) -> None:
     Returns:
         None
     """
-    train = read_train_dataset()[:144]
+    train = read_dataset(RAW_DATA_PATH / "train" / TRAIN_FILENAME)[:144]
+    train.columns = ["id", "text", "score"]
     modify_texts(train, "text")
     train = set_flag_using_prompted_data(train)
     divide_train_into_folds(train, n_splits=cfg.n_folds)

@@ -1,14 +1,10 @@
-import logging
-
 import fire
 import mlflow
 import mlflow.pytorch
 import mlflow.transformers
-from dvc.repo import Repo
 from lightning.pytorch import seed_everything
 from omegaconf import OmegaConf
 
-from .common.constants import ALL_DATA_FILENAMES, RAW_DATA_PATH
 from .common.hydra import create_paths, load_config
 from .common.logging_config import start_logging
 from .common.utils import register_new_utf_errors, set_torch_params
@@ -28,26 +24,6 @@ def start_mlflow() -> None:
     mlflow.autolog()
     mlflow.pytorch.autolog()
     mlflow.transformers.autolog()
-
-
-def ensure_data() -> None:
-    """Гарантирует наличие CSV-файлов локально, иначе качает из Cloud.ru."""
-    missing = [f for f in ALL_DATA_FILENAMES if not (RAW_DATA_PATH / f).is_file()]
-    if missing:
-        logging.info(
-            "Локальных файлов %s нет — качаю их из удалённого хранилища…",
-            ", ".join(missing),
-        )
-        Repo(".").pull(targets=[str(RAW_DATA_PATH)], remote="storage-cloud")
-
-        # проверяем, что после pull всё появилось
-        still_missing = [f for f in missing if not (RAW_DATA_PATH / f).is_file()]
-        if still_missing:
-            raise FileNotFoundError(
-                f"После pull отсутствуют файлы: {', '.join(still_missing)}"
-            )
-    else:
-        logging.info("Все исходные CSV уже есть локально.")
 
 
 def train_model_full_pipeline(
@@ -86,9 +62,6 @@ def train_model_full_pipeline(
         mlflow.log_dict(OmegaConf.to_container(cfg, resolve=True), "config.json")
         mlflow.set_tag("seed", cfg.seed)
         # print(f"Final Configurations: \n{OmegaConf.to_yaml(cfg)}")
-
-        mlflow.set_tag("stage", "load_data")
-        ensure_data()
 
         # ───────────────── data ────────────────── #
         mlflow.set_tag("stage", "data_preprocessing")
