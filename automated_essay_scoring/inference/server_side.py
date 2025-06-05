@@ -25,10 +25,11 @@ class TritonPythonModel:
         #   f"{self.submodel}_fold{self.fold}_stage2"
         self.full_name = f"model{self.submodel}_fold{self.fold}_stage2"
 
-        # We’ll cache the “model_name” to which we forward every request.
-        # Triton ensures that “self.full_name” is already loaded (either as
-        # tensorrt_plan or onnxruntime_onnx) in the same Triton server.
-        self.triton_client = pb_utils.TritonClient()
+        # We cache the sub-model name to which we forward every request.
+        # Triton ensures that ``self.full_name`` is already loaded
+        # (either as ``tensorrt_plan`` or ``onnxruntime_onnx``) in the same
+        # server, so we can create ``InferenceRequest`` objects directly
+        # without an additional client instance.
 
     def execute(self, requests):
         responses = []
