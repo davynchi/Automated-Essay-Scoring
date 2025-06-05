@@ -108,19 +108,19 @@ class EssayScoringPL(L.LightningModule):
         )
 
         total_steps = self.trainer.estimated_stepping_batches
-        scheduler_type = self.cfg.base.scheduler.lower()
+        scheduler_type = self.cfg.base.scheduler.type.lower()
         if scheduler_type == "linear":
             scheduler = get_linear_schedule_with_warmup(
                 optimizer,
-                num_warmup_steps=self.cfg.base.num_warmup_steps,
+                num_warmup_steps=self.cfg.base.scheduler.num_warmup_steps,
                 num_training_steps=total_steps,
             )
         elif scheduler_type == "cosine":
             scheduler = get_cosine_schedule_with_warmup(
                 optimizer,
-                num_warmup_steps=self.cfg.base.num_warmup_steps,
+                num_warmup_steps=self.cfg.base.scheduler.num_warmup_steps,
                 num_training_steps=total_steps,
-                num_cycles=self.cfg.base.num_cycles,
+                num_cycles=self.cfg.base.scheduler.num_cycles,
             )
         else:
             raise ValueError(f"Unsupported scheduler type: {self.cfg.base.scheduler}")

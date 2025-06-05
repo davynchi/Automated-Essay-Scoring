@@ -1,12 +1,15 @@
 # base.yaml (equivalent of CFG class)
+scheduler:
+  num_warmup_steps: 0
+  num_cycles: 0.5
+  type: "cosine" # ['linear', 'cosine']
+
 debug: False
 apex: True
 print_freq: 100
 num_workers: 4
-scheduler: "cosine" # ['linear', 'cosine']
+
 batch_scheduler: True
-num_cycles: 0.5
-num_warmup_steps: 0
 epochs: 1 # Было 5
 encoder_lr: 1e-5
 decoder_lr: 1e-5
