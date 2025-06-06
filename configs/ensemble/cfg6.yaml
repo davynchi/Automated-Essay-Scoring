@@ -1,6 +1,6 @@
 # ensemble/cfg2.yaml
 defaults:
-  - base@base
+  - train@base
 
 max_len: 1024 # 1536
 head: "lstm"

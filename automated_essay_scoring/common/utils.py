@@ -13,6 +13,8 @@ from sklearn.metrics import cohen_kappa_score
 from text_unidecode import unidecode
 from transformers import DebertaTokenizer
 
+from .constants import MAX_SPLIT_SIZE_MB
+
 
 log = logging.getLogger(__name__)
 
@@ -36,7 +38,7 @@ def set_torch_params() -> None:
     """
     os.environ[
         "PYTORCH_CUDA_ALLOC_CONF"
-    ] = "expandable_segments:True,max_split_size_mb:128"
+    ] = f"expandable_segments:True,max_split_size_mb:{MAX_SPLIT_SIZE_MB}"
     os.environ["TOKENIZERS_PARALLELISM"] = "true"
     torch.backends.cuda.enable_flash_sdp(True)
     torch.backends.cudnn.deterministic = True

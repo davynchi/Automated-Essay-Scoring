@@ -1,6 +1,6 @@
 # ensemble/cfg2.yaml
 defaults:
-  - base@base
+  - train@base
 
 max_len: 768 # 1024
 head: "attention"
