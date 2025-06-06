@@ -265,7 +265,7 @@ def train_one_stage(
                 seq_len=cfg_unit.max_len,
                 fp16=True,
                 int8=False,
-                workspace_mb=4096,
+                workspace_mb=cfg.inference.workspace_mb,
             )
             artefact_path = Path(plan_path)
         else:
