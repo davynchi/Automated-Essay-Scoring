@@ -1,6 +1,8 @@
 Пайплайн для обучения и инференса модели для автоматического выставления оценок
 по написанным эссе.
 
+Проект основан на [решении](https://www.kaggle.com/competitions/learning-agency-lab-automated-essay-scoring-2/writeups/ho-3rd-place-solution), которое заняло 3 место на соревновании [Learning Agency Lab - Automated Essay Scoring 2.0](https://www.kaggle.com/competitions/learning-agency-lab-automated-essay-scoring-2/data). Спасибо [автору](https://www.kaggle.com/dsohonosom) за базовые jupyter-ноутбуки.
+
 # Automated Essay Scoring
 
 #### Давыдов Михаил
