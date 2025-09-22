@@ -111,7 +111,7 @@ def add_pred_and_score_columns(
     test_df["score"] = get_essay_score(test_df["pred"].values) + 1
 
 
-def get_score_on_test_data(test_df: pd.DataFrame) -> float:
+def get_score_on_test_data(cfg, test_df: pd.DataFrame) -> float:
     """
     Объединяет переданный test_df (essay_id, score_pred) с истинными оценками
     из RAW_DATA_PATH/"test"/TEST_SCORE_FILENAME, вычисляет Quadratic Weighted Kappa
@@ -125,7 +125,7 @@ def get_score_on_test_data(test_df: pd.DataFrame) -> float:
         float: Значение QWK (квадратично-взвешенный каппа).
     """
     true_df: pd.DataFrame = read_dataset(RAW_DATA_PATH / "test" / TEST_SCORE_FILENAME)[
-        :256
+        : cfg.inference.test_rows
     ]
     true_df.rename(columns={"score": "score_true"}, inplace=True)
 
@@ -150,7 +150,7 @@ def get_score_on_test_data(test_df: pd.DataFrame) -> float:
     return final_score
 
 
-def make_submission_triton(cfg, triton_url: str = "localhost:8001") -> None:
+def make_submission_triton(cfg) -> None:
     """
     Mirror make_submission_lightning, but call Triton instead of ONNXSession:
 
@@ -164,12 +164,14 @@ def make_submission_triton(cfg, triton_url: str = "localhost:8001") -> None:
     5) write_submission()
     """
     # Step 1: data + tokenizer
-    test_df = read_dataset(RAW_DATA_PATH / "test" / TEST_FILENAME)[:256]
+    test_df = read_dataset(RAW_DATA_PATH / "test" / TEST_FILENAME)[
+        : cfg.inference.test_rows
+    ]
     modify_texts(test_df, "full_text")
     tokenizer = create_tokenizer(path=PATH_TO_TOKENIZER)
 
     # Triton gRPC client
-    client = grpcclient.InferenceServerClient(triton_url)
+    client = grpcclient.InferenceServerClient(cfg.inference.triton_url)
 
     all_model_preds: list[np.ndarray] = []
 
@@ -216,4 +218,4 @@ def make_submission_triton(cfg, triton_url: str = "localhost:8001") -> None:
     # Step 4: Blend & write
     add_pred_and_score_columns(test_df, all_model_preds)
     write_submission(test_df)
-    get_score_on_test_data(test_df)
+    get_score_on_test_data(cfg, test_df)

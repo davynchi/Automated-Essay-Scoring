@@ -1,8 +1,10 @@
 defaults:
   - _self_
-  - pretrain@pretrain
-  - ensemble/base@base
+  - preprocess@base
+  - pretrain@base
+  - train@base
   - ensemble@ensemble
+  - inference@base
 
-n_folds: 2 # Было 20, потом поправь
+n_folds: 2
 seed: 42

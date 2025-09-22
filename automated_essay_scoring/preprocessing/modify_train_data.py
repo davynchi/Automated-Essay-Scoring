@@ -129,7 +129,9 @@ def modify_train_data(cfg) -> None:
     Returns:
         None
     """
-    train = read_dataset(RAW_DATA_PATH / "train" / TRAIN_FILENAME)[:144]
+    train = read_dataset(RAW_DATA_PATH / "train" / TRAIN_FILENAME)[
+        : cfg.preprocess.limit_train_rows
+    ]
     train.columns = ["id", "text", "score"]
     modify_texts(train, "text")
     train = set_flag_using_prompted_data(train)
